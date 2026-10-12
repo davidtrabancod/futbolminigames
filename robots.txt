@@ -1,6 +1,4 @@
 User-agent: *
 Allow: /
 
-# Directivas para rastreadores de motores de búsqueda
-Sitemap: https://futbolinkids.example.com/sitemap.xml
-
+Sitemap: https://futbolminigames.vercel.app/sitemap.xml
