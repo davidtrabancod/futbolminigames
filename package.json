@@ -1,0 +1,16 @@
+{
+  "name": "futbolin-kids-arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Futbolín Kids Arena with persistent accounts and realtime online penalty matches",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
