@@ -148,7 +148,7 @@ function mimeType(filePath) {
     '.jpeg': 'image/jpeg',
     '.ico': 'image/x-icon',
     '.txt': 'text/plain; charset=utf-8',
-    '.xml': 'application/xml'
+    '.xml': 'application/xml; charset=utf-8'
   })[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
 }
 
