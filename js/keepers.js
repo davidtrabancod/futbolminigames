@@ -13,13 +13,36 @@
     { id: 'kitsune', name: 'Yuki Kitsune', title: 'Zorro de la noche', unlockRating: 2200, colors: ['#c17aff', '#5425a0', '#ffcf65', '#202448'], skin: '#f4c9a8', hair: '#312347', style: 'ears', sigil: '狐' },
     { id: 'titan', name: 'Titán Solar', title: 'La última muralla', unlockRating: 2400, colors: ['#ffe45e', '#c67713', '#fff2b3', '#493326'], skin: '#8e533c', hair: '#28232b', style: 'crown', sigil: '★' }
   ];
+  roster.forEach((keeper, index) => { keeper.artIndex = index; });
   const byId = value => {
     const id = typeof value === 'string' ? value : value?.id;
     return roster.find(item => item.id === id) || roster[0];
   };
+  const cardArt = typeof Image !== 'undefined' ? new Image() : null;
+  const matchArt = typeof Image !== 'undefined' ? new Image() : null;
+  if (cardArt) {
+    cardArt.src = './assets/goalkeeper-roster.png';
+    cardArt.onload = () => document.querySelectorAll('.keeper-card__portrait').forEach(canvas =>
+      paintPortrait(canvas, canvas.dataset.keeperId, canvas.parentElement.classList.contains('is-equipped')));
+  }
+  if (matchArt) matchArt.src = './assets/goalkeeper-sprites.png';
 
   function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false) {
     const p = byId(typeof keeper === 'string' ? keeper : keeper?.id);
+    if (matchArt?.complete && matchArt.naturalWidth) {
+      const cellWidth = matchArt.naturalWidth / 4;
+      const cellHeight = matchArt.naturalHeight / 2;
+      const col = p.artIndex % 4;
+      const row = Math.floor(p.artIndex / 4);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(diving ? Math.sin(time * 8) * .14 : Math.sin(time * 2) * .012);
+      ctx.translate(0, Math.sin(time * (p.artIndex % 2 ? 4.2 : 2.8)) * (diving ? 0 : 1.2));
+      ctx.scale(scale, scale);
+      ctx.drawImage(matchArt, col * cellWidth, row * cellHeight, cellWidth, cellHeight, -32, -170, 64, 170);
+      ctx.restore();
+      return;
+    }
     const [bright, dark, trim, shorts] = p.colors;
     ctx.save();
     const rhythm = p.style === 'spikes' || p.style === 'bandana' ? 5 : p.style === 'helmet' ? 2 : 3.2;
@@ -101,6 +124,17 @@
     canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
     ctx.scale(ratio, ratio);
     const p = byId(keeper);
+    canvas.dataset.keeperId = p.id;
+    if (cardArt?.complete && cardArt.naturalWidth) {
+      const cellWidth = cardArt.naturalWidth / 4;
+      const cellHeight = cardArt.naturalHeight / 2;
+      const sourceHeight = Math.min(cellHeight, cellWidth * height / width);
+      const sourceY = Math.floor(p.artIndex / 4) * cellHeight + 20;
+      ctx.drawImage(cardArt, (p.artIndex % 4) * cellWidth, sourceY, cellWidth, sourceHeight, 0, 0, width, height);
+      ctx.fillStyle = 'rgba(3,12,26,.1)'; ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = p.colors[0]; ctx.lineWidth = selected ? 3 : 1.5; ctx.strokeRect(1, 1, width - 2, height - 2);
+      return;
+    }
     const [bright,dark,trim] = p.colors;
     const bg = ctx.createLinearGradient(0,0,width,height);
     bg.addColorStop(0, '#71d8ff'); bg.addColorStop(.34, '#d8f6ff'); bg.addColorStop(.48, dark); bg.addColorStop(1, '#050b18');

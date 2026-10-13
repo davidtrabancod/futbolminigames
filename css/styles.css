@@ -2719,3 +2719,37 @@ body > footer {
   .keeper-select__status { text-align:left; }
 }
 @media (prefers-reduced-motion:reduce) { .keeper-card,.keeper-card::after { animation:none!important; transition:none!important; } }
+
+/* Give the live play panel the strongest visual pull on the home screen. */
+.online-hub__play {
+  border: 1px solid rgba(71, 255, 177, .65);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 210, 76, .16), transparent 40%),
+    linear-gradient(150deg, rgba(7, 84, 61, .98), rgba(2, 25, 35, .99));
+  box-shadow: 0 0 0 1px rgba(22, 228, 146, .14), 0 0 36px rgba(17, 240, 151, .18), inset 0 1px rgba(255,255,255,.12);
+}
+.online-hub__play::before {
+  position:absolute; inset:0; z-index:-1; content:""; pointer-events:none;
+  background:radial-gradient(ellipse at 50% 14%,rgba(67,255,179,.15),transparent 58%);
+  animation:playPanelCharge 3.2s ease-in-out infinite;
+}
+.online-hub__play .online-hub__duel-heading { margin:.8rem 0 1rem; }
+.online-hub__play .online-hub__duel-heading h3 {
+  color:#fff0ae; font-size:clamp(1.65rem,3vw,2.25rem); text-shadow:0 3px 0 #795514,0 0 22px rgba(255,215,80,.34);
+}
+.online-hub__play .online-hub__duel-heading p { color:#d1f8e7; font-size:.96rem; }
+.online-hub__play .online-hub__actions { gap:.8rem; margin:.9rem 0 1rem; }
+.online-hub__play .online-action {
+  min-height:4.2rem; border-radius:1rem; font-size:1rem; letter-spacing:.055em;
+  box-shadow:0 6px 0 rgba(0,0,0,.36),0 0 21px rgba(67,255,179,.18);
+  transition:transform .18s ease,filter .18s ease,box-shadow .18s ease;
+}
+.online-hub__play .online-action:hover:not(:disabled) {
+  transform:translateY(-4px) scale(1.025); filter:brightness(1.12);
+  box-shadow:0 9px 0 rgba(0,0,0,.3),0 0 30px rgba(67,255,179,.4);
+}
+.online-hub__play .online-action:first-child { animation:playButtonPulse 2.8s ease-in-out infinite; }
+.online-hub__play .online-hub__stadium { border-color:rgba(255,222,94,.58); box-shadow:inset 0 0 30px rgba(69,248,172,.14),0 0 22px rgba(255,211,76,.12); }
+@keyframes playPanelCharge { 0%,100%{opacity:.55} 50%{opacity:1} }
+@keyframes playButtonPulse { 0%,100%{filter:brightness(1);box-shadow:0 6px 0 rgba(0,0,0,.36),0 0 15px rgba(67,255,179,.15)} 50%{filter:brightness(1.08);box-shadow:0 6px 0 rgba(0,0,0,.36),0 0 27px rgba(67,255,179,.32)} }
+@media (prefers-reduced-motion:reduce) { .online-hub__play::before,.online-hub__play .online-action:first-child { animation:none; } }
