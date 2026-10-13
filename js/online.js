@@ -129,7 +129,7 @@ class OnlineArena {
     });
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      throw new Error('No se encontró la API del juego. Inicia el proyecto con «npm start» y abre la dirección que muestra la terminal (normalmente http://localhost:3000).');
+      throw new Error('La API no está disponible en esta publicación. En Vercel hay que desplegar también el backend y conectarlo a una base de datos persistente.');
     }
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `Solicitud fallida (${response.status}).`);
