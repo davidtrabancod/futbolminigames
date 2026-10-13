@@ -185,7 +185,7 @@ function removeInviteFor(ws) {
 }
 
 function userForMatch(user) {
-  return { id: user.id, nickname: user.nickname, avatar: user.avatar, rating: user.rating, rank: user.rank, wins: user.wins, matches: user.matches };
+  return { id: user.id, nickname: user.nickname, avatar: user.avatar, keeperId: user.keeperId || 'rookie', rating: user.rating, rank: user.rank, wins: user.wins, matches: user.matches };
 }
 
 function createMatch({ players, mode }) {
@@ -494,6 +494,12 @@ async function handleApi(req, res, url) {
     if (!user) return sendJson(res, 401, { error: 'Inicia sesión para editar tu perfil.' });
     const body = await readJsonBody(req);
     const updated = database.updateProfile(user.id, body);
+    return sendJson(res, 200, { user: database.publicUser(updated) });
+  }
+  if (method === 'PUT' && pathname === '/api/goalkeeper') {
+    if (!user) return sendJson(res, 401, { error: 'Inicia sesión para elegir tu portero.' });
+    const body = await readJsonBody(req);
+    const updated = database.updateGoalkeeper(user.id, body.keeperId);
     return sendJson(res, 200, { user: database.publicUser(updated) });
   }
   return sendJson(res, 404, { error: 'Ruta API no encontrada.' });

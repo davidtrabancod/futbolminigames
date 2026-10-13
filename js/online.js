@@ -37,6 +37,8 @@ class OnlineArena {
       profileSubmitBtn: document.getElementById('profileSubmitBtn'),
       logoutBtn: document.getElementById('logoutBtn'),
       onlineStatus: document.getElementById('onlineStatus'),
+      goalkeeperRoster: document.getElementById('goalkeeperRoster'),
+      goalkeeperSelectionStatus: document.getElementById('goalkeeperSelectionStatus'),
       rankedMatchBtn: document.getElementById('rankedMatchBtn'),
       createFriendlyBtn: document.getElementById('createFriendlyBtn'),
       joinInviteForm: document.getElementById('joinInviteForm'),
@@ -84,6 +86,10 @@ class OnlineArena {
 
   bindEvents() {
     this.refs.profileButton.addEventListener('click', () => this.openProfile());
+    this.refs.goalkeeperRoster?.addEventListener('click', event => {
+      const card = event.target.closest('[data-keeper-id]');
+      if (card) this.selectGoalkeeper(card.dataset.keeperId);
+    });
     document.getElementById('closeProfileBtn').addEventListener('click', () => this.closeProfile());
     this.refs.profileModal.addEventListener('click', event => {
       if (event.target === this.refs.profileModal) this.closeProfile();
@@ -242,6 +248,52 @@ class OnlineArena {
       const rankStatus = document.querySelector('.game-card__rank-status');
       if (rankValue) rankValue.textContent = '—';
       if (rankStatus) rankStatus.textContent = 'Inicia sesión para competir';
+    }
+    this.renderGoalkeeperRoster();
+    if (this.app.games?.penaltis) this.app.games.penaltis.setOnlineGoalkeeper(this.user?.keeperId || 'rookie');
+  }
+
+  renderGoalkeeperRoster() {
+    const host = this.refs.goalkeeperRoster;
+    const library = window.GOALKEEPER_ROSTER;
+    if (!host || !library) return;
+    const rating = Number(this.user?.rating) || 1000;
+    const equipped = this.user?.keeperId || 'rookie';
+    host.replaceChildren();
+    library.roster.forEach(keeper => {
+      const unlocked = rating >= keeper.unlockRating;
+      const selected = keeper.id === equipped;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `keeper-card${selected ? ' is-equipped' : ''}${unlocked ? '' : ' is-locked'}`;
+      card.dataset.keeperId = keeper.id;
+      card.disabled = !unlocked || selected || !this.user;
+      card.setAttribute('aria-label', `${keeper.name}: ${unlocked ? (selected ? 'equipado' : 'seleccionar') : `se desbloquea con ${keeper.unlockRating} puntos`}`);
+      const portrait = document.createElement('canvas');
+      portrait.className = 'keeper-card__portrait';
+      portrait.setAttribute('aria-hidden', 'true');
+      const info = document.createElement('span'); info.className = 'keeper-card__info';
+      const name = document.createElement('strong'); name.textContent = keeper.name;
+      const title = document.createElement('small'); title.textContent = keeper.title;
+      const badge = document.createElement('span'); badge.className = 'keeper-card__badge';
+      badge.textContent = selected ? 'EQUIPADO' : unlocked ? 'DESBLOQUEADO' : `${keeper.unlockRating} PTS`;
+      info.append(name, title, badge); card.append(portrait, info); host.append(card);
+      library.paintPortrait(portrait, keeper, selected);
+    });
+    this.refs.goalkeeperSelectionStatus.textContent = !this.user
+      ? 'Inicia sesión para elegir y guardar tu portero'
+      : `${rating.toLocaleString('es-ES')} pts · ${library.roster.filter(item => rating >= item.unlockRating).length}/${library.roster.length} desbloqueados`;
+  }
+
+  async selectGoalkeeper(id) {
+    if (!this.user) { this.openProfile(); return; }
+    this.refs.goalkeeperSelectionStatus.textContent = 'Guardando elección…';
+    try {
+      const { user } = await this.api('/api/goalkeeper', { method: 'PUT', body: JSON.stringify({ keeperId: id }) });
+      this.setUser(user);
+      this.refs.goalkeeperSelectionStatus.textContent = `${window.GOALKEEPER_ROSTER.byId(id).name} equipado para el próximo duelo`;
+    } catch (error) {
+      this.refs.goalkeeperSelectionStatus.textContent = error.message;
     }
   }
 
@@ -586,6 +638,8 @@ class OnlineArena {
 
     const you = message.you || this.user || {};
     const opponent = message.opponent || {};
+    this.youKeeperId = you.keeperId || this.user?.keeperId || 'rookie';
+    this.opponentKeeperId = opponent.keeperId || 'rookie';
     this.refs.onlineYouAvatar.textContent = you.avatar || '⚽';
     this.refs.onlineYouName.textContent = you.nickname || 'Tú';
     this.refs.onlineYouMeta.textContent = `${you.rating ?? 1000} pts`;
@@ -716,6 +770,8 @@ class OnlineArena {
     }
 
     if (this.app.games && this.app.games.penaltis) {
+      const defendingKeeper = shooterIsYou ? this.opponentKeeperId : this.youKeeperId;
+      this.app.games.penaltis.setOnlineGoalkeeper(defendingKeeper);
       this.app.games.penaltis.onlineRole = shooterIsYou ? 'lanzador' : 'portero';
       if (typeof this.app.games.penaltis.triggerOnlineShotAnimation === 'function') {
         const currentTurnRole = shooterIsYou ? 'shooter' : 'goalkeeper';

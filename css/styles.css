@@ -2677,3 +2677,36 @@ body > footer {
     transition: none;
   }
 }
+
+/* Selectable anime arcade goalkeeper roster */
+.keeper-select {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid rgba(65, 240, 178, .22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(10, 43, 48, .9), rgba(3, 22, 33, .94));
+  box-shadow: inset 0 1px rgba(255,255,255,.04), 0 12px 32px rgba(0,0,0,.18);
+}
+.keeper-select__heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:.8rem; }
+.keeper-select__heading h4 { margin:.2rem 0 0; color:#fff0b3; font-size:1.25rem; font-weight:900; letter-spacing:.02em; }
+.keeper-select__status { color:#9ce9cf; font-size:.75rem; text-align:right; }
+.keeper-roster { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; }
+.keeper-card { position:relative; min-width:0; padding:0; overflow:hidden; border:1px solid rgba(139,203,196,.2); border-radius:12px; color:#f5f6e8; text-align:left; background:#071e29; transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,filter .18s ease; }
+.keeper-card:not(:disabled):hover { transform:translateY(-3px) scale(1.025); border-color:#53efb0; box-shadow:0 0 0 1px rgba(83,239,176,.24),0 8px 22px rgba(0,0,0,.38); }
+.keeper-card:disabled { cursor:default; }
+.keeper-card.is-equipped { border-color:#ffdc4b; box-shadow:0 0 18px rgba(255,208,51,.18); }
+.keeper-card.is-locked .keeper-card__portrait { filter:grayscale(.82) brightness(.55); }
+.keeper-card__portrait { display:block; width:100%; height:94px; }
+.keeper-card__info { display:flex; flex-direction:column; gap:2px; padding:.48rem .55rem .55rem; }
+.keeper-card__info strong { overflow:hidden; color:#fff3ca; font-size:.82rem; text-overflow:ellipsis; white-space:nowrap; }
+.keeper-card__info small { overflow:hidden; color:#9abbb6; font-size:.67rem; text-overflow:ellipsis; white-space:nowrap; }
+.keeper-card__badge { align-self:flex-start; margin-top:.24rem; padding:.14rem .38rem; border:1px solid rgba(255,255,255,.12); border-radius:4px; color:#b5ccc7; font-size:.56rem; font-weight:900; letter-spacing:.06em; }
+.keeper-card.is-equipped .keeper-card__badge { border-color:rgba(255,218,66,.55); color:#ffe05c; background:rgba(255,208,51,.1); }
+.keeper-card:not(.is-locked):not(.is-equipped) .keeper-card__badge { border-color:rgba(55,223,151,.3); color:#76edb5; }
+@media (max-width:640px) {
+  .keeper-select { padding:.75rem; }
+  .keeper-roster { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; }
+  .keeper-card__portrait { height:82px; }
+  .keeper-select__heading { align-items:flex-start; flex-direction:column; gap:.3rem; }
+  .keeper-select__status { text-align:left; }
+}

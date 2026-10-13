@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { neon } = require('@neondatabase/serverless');
 const { AVATARS, SESSION_DAYS } = require('./database');
+const GOALKEEPERS = require('../js/keepers');
 
 const MAX_BODY_BYTES = 16 * 1024;
 const PASSWORD_BYTES = 64;
@@ -39,6 +40,7 @@ async function ensureSchema(sql) {
         expires_at BIGINT NOT NULL,
         created_at BIGINT NOT NULL
       )`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
       await sql`CREATE INDEX IF NOT EXISTS sessions_user_id ON sessions(user_id)`;
       await sql`CREATE INDEX IF NOT EXISTS users_leaderboard ON users(rating DESC, wins DESC, nickname_key ASC)`;
       await sql`CREATE TABLE IF NOT EXISTS auth_attempts (
@@ -84,6 +86,7 @@ function publicUser(row, rank) {
     id: row.id,
     nickname: row.nickname,
     avatar: row.avatar,
+    keeperId: row.keeper_id || 'rookie',
     rating: row.rating,
     rank,
     wins: row.wins,
@@ -239,6 +242,17 @@ async function updateProfile(sql, userId, body) {
   }
 }
 
+async function updateGoalkeeper(sql, userId, body) {
+  const keeper = GOALKEEPERS.byId(body.keeperId);
+  if (keeper.id !== body.keeperId) throw appError('Ese portero no existe.');
+  const [row] = await sql`UPDATE users SET keeper_id = ${keeper.id}, updated_at = ${Date.now()}
+    WHERE id = ${userId} AND rating >= ${keeper.unlockRating} RETURNING *`;
+  if (row) return row;
+  const [user] = await sql`SELECT rating FROM users WHERE id = ${userId}`;
+  if (!user) throw appError('No se encontró tu cuenta.', 404);
+  throw appError(`Desbloquea este portero al llegar a ${keeper.unlockRating} puntos.`);
+}
+
 function createHandler(endpoint) {
   return async function handler(req, res) {
     try {
@@ -287,7 +301,14 @@ function createHandler(endpoint) {
         return setJson(res, 200, { user: await getPublicUser(sql, updated) });
       }
 
-      return setJson(res, 405, { error: 'Método no permitido.' }, { Allow: endpoint === 'me' || endpoint === 'leaderboard' ? 'GET' : endpoint === 'profile' ? 'PUT' : 'POST' });
+      if (endpoint === 'goalkeeper' && method === 'PUT') {
+        const user = await userFromSession(sql, token);
+        if (!user) throw appError('Inicia sesión para elegir tu portero.', 401);
+        const updated = await updateGoalkeeper(sql, user.id, await readBody(req));
+        return setJson(res, 200, { user: await getPublicUser(sql, updated) });
+      }
+
+      return setJson(res, 405, { error: 'Método no permitido.' }, { Allow: endpoint === 'me' || endpoint === 'leaderboard' ? 'GET' : endpoint === 'profile' || endpoint === 'goalkeeper' ? 'PUT' : 'POST' });
     } catch (error) {
       const statusCode = error.statusCode || 500;
       if (statusCode >= 500) console.error(`Vercel API (${endpoint}):`, error);

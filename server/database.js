@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
+const GOALKEEPERS = require('../js/keepers');
 
 const AVATARS = ['⚽', '🥅', '🧤', '🐯', '🦊', '🐼', '🦁', '🐸', '🐵', '🐧', '🐲', '⭐'];
 const SESSION_DAYS = 30;
@@ -30,6 +31,7 @@ class ArenaDatabase {
         wins INTEGER NOT NULL DEFAULT 0,
         losses INTEGER NOT NULL DEFAULT 0,
         matches INTEGER NOT NULL DEFAULT 0,
+        keeper_id TEXT NOT NULL DEFAULT 'rookie',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
@@ -56,6 +58,10 @@ class ArenaDatabase {
       );
       CREATE INDEX IF NOT EXISTS matches_finished_at ON matches(finished_at DESC);
     `);
+    const userColumns = this.db.prepare('PRAGMA table_info(users)').all();
+    if (!userColumns.some(column => column.name === 'keeper_id')) {
+      this.db.exec("ALTER TABLE users ADD COLUMN keeper_id TEXT NOT NULL DEFAULT 'rookie'");
+    }
     this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
   }
 
@@ -93,6 +99,7 @@ class ArenaDatabase {
       id: row.id,
       nickname: row.nickname,
       avatar: row.avatar,
+      keeperId: row.keeper_id || 'rookie',
       rating: row.rating,
       rank,
       wins: row.wins,
@@ -150,6 +157,16 @@ class ArenaDatabase {
       if (error.code === 'ERR_SQLITE_ERROR' && error.errcode === 2067) throw inputError('Ese nickname ya está en uso.');
       throw error;
     }
+    return this.getUserById(userId);
+  }
+
+  updateGoalkeeper(userId, keeperId) {
+    const keeper = GOALKEEPERS.byId(keeperId);
+    if (keeper.id !== keeperId) throw inputError('Ese portero no existe.');
+    const user = this.getUserById(userId);
+    if (!user) throw inputError('No se encontró tu cuenta.');
+    if (user.rating < keeper.unlockRating) throw inputError(`Desbloquea este portero al llegar a ${keeper.unlockRating} puntos.`);
+    this.db.prepare('UPDATE users SET keeper_id = ?, updated_at = ? WHERE id = ?').run(keeper.id, Date.now(), userId);
     return this.getUserById(userId);
   }
 

@@ -1341,6 +1341,11 @@ class PenaltisGame {
     const k = this.keeper;
     const lvl = this.currentLevel;
 
+    if (this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
+      window.GOALKEEPER_ROSTER.draw(ctx, this.onlineGoalkeeperId, k.x, k.y, 0.82, performance.now() / 1000, k.diving);
+      return;
+    }
+
     ctx.save();
     ctx.translate(k.x, k.y);
     ctx.rotate(k.rotation);
@@ -1425,6 +1430,11 @@ class PenaltisGame {
     this.drawKeeperGlove(ctx, span, gy, true);
 
     ctx.restore();
+  }
+
+  setOnlineGoalkeeper(id) {
+    const roster = window.GOALKEEPER_ROSTER;
+    this.onlineGoalkeeperId = roster ? roster.byId(id).id : 'rookie';
   }
 
   drawKeeperGlove(ctx, x, y, isRight) {

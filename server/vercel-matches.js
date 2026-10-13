@@ -88,6 +88,7 @@ async function ensureSchema(sql) {
         turn_started_at BIGINT,
         expires_at BIGINT
       )`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
       await sql`CREATE INDEX IF NOT EXISTS online_matches_players_state ON online_matches(player_one, player_two, state)`;
       await sql`CREATE TABLE IF NOT EXISTS online_queue (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -112,7 +113,7 @@ async function ensureSchema(sql) {
       await sql`CREATE OR REPLACE FUNCTION arena_public_user(p_user_id INTEGER) RETURNS JSONB
         LANGUAGE SQL STABLE AS $function$
           SELECT jsonb_build_object(
-            'id', u.id, 'nickname', u.nickname, 'avatar', u.avatar,
+            'id', u.id, 'nickname', u.nickname, 'avatar', u.avatar, 'keeperId', u.keeper_id,
             'rating', u.rating, 'rank', (
               SELECT COUNT(*)::INTEGER + 1 FROM users better
               WHERE better.rating > u.rating
