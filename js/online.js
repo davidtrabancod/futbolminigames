@@ -719,12 +719,10 @@ class OnlineArena {
       this.app.games.penaltis.onlineRole = shooterIsYou ? 'lanzador' : 'portero';
       if (typeof this.app.games.penaltis.triggerOnlineShotAnimation === 'function') {
         const currentTurnRole = shooterIsYou ? 'shooter' : 'goalkeeper';
-        this.app.games.penaltis.triggerOnlineShotAnimation(message.shooterZone, message.keeperZone, currentTurnRole, isGoal);
+        const shooterZone = message.shooterZone || message.shotZone;
+        const keeperZone = message.keeperZone || message.saveZone;
+        this.app.games.penaltis.triggerOnlineShotAnimation(shooterZone, keeperZone, currentTurnRole, isGoal);
       }
-    }
-
-    if (typeof this.app.showOnlineShotResultAnimation === 'function') {
-      this.app.showOnlineShotResultAnimation(isGoal);
     }
 
     this.updateScoreboard(message.scores, message.shots, message.suddenDeath);

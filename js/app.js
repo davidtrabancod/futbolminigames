@@ -518,23 +518,6 @@ class App {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  showOnlineShotResultAnimation(isGoal) {
-    const notification = document.createElement('div');
-    notification.className = 'absolute inset-0 flex items-center justify-center z-50 pointer-events-none';
-    notification.innerHTML = `
-      <div class="bg-slate-900/90 border-4 ${isGoal ? 'border-emerald-500 text-emerald-400' : 'border-rose-500 text-rose-400'} text-4xl md:text-6xl font-extrabold px-8 py-4 rounded-3xl shadow-2xl animate-popup uppercase tracking-wider">
-        ${isGoal ? '⚽ ¡GOLAZO!' : '🧤 ¡PARADÓN!'}
-      </div>
-    `;
-    const targetArea = document.getElementById('gameScreen') || document.body;
-    targetArea.style.position = 'relative';
-    targetArea.appendChild(notification);
-
-    setTimeout(() => {
-      notification.remove();
-    }, 2000);
-  }
-
   goToMenu() {
     window.soundManager.stopCountryMusic();
     this.gameState = 'menu';
