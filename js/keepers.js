@@ -61,8 +61,11 @@
     if (p.style === 'spikes') { ctx.lineTo(18,-60); ctx.lineTo(7,-56); ctx.lineTo(2,-68); ctx.lineTo(-4,-57); ctx.lineTo(-15,-61); }
     else { ctx.lineTo(9,-50); ctx.lineTo(3,-55); ctx.lineTo(-2,-50); ctx.lineTo(-8,-56); }
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#17243a'; ctx.beginPath(); ctx.ellipse(-5,-43,1.7,2.6,0,0,Math.PI*2); ctx.ellipse(5,-43,1.7,2.6,0,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#472c35'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-7,-47); ctx.lineTo(-3,-48); ctx.moveTo(3,-48); ctx.lineTo(7,-47); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-5,-43,3.1,4,0,0,Math.PI*2); ctx.ellipse(5,-43,3.1,4,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = p.eyes || bright; ctx.beginPath(); ctx.ellipse(-5,-42.5,1.9,3,0,0,Math.PI*2); ctx.ellipse(5,-42.5,1.9,3,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#17243a'; ctx.beginPath(); ctx.arc(-5,-42,1.1,0,Math.PI*2); ctx.arc(5,-42,1.1,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-5.7,-44,1,0,Math.PI*2); ctx.arc(4.3,-44,1,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = p.hair; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-8,-48); ctx.lineTo(-3,-49); ctx.moveTo(3,-49); ctx.lineTo(8,-48); ctx.stroke();
     ctx.strokeStyle = '#a95556'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2,-36); ctx.quadraticCurveTo(0,-34,3,-36); ctx.stroke();
     if (p.style === 'headband' || p.style === 'bandana') { ctx.fillStyle = trim; ctx.beginPath(); ctx.roundRect(-14,-53,28,4,2); ctx.fill(); ctx.fillRect(10,-51,9,3); }
     if (p.style === 'visor' || p.style === 'helmet' || p.style === 'crown') {
@@ -95,13 +98,51 @@
     canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
     ctx.scale(ratio, ratio);
     const p = byId(keeper);
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, 'rgba(24,82,77,.95)'); gradient.addColorStop(1, 'rgba(5,23,38,.98)');
-    ctx.fillStyle = gradient; ctx.fillRect(0,0,width,height);
-    ctx.strokeStyle = p.colors[0]; ctx.globalAlpha = selected ? .5 : .16; ctx.lineWidth = 1;
-    for (let i=-height;i<width;i+=18) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i+height,height); ctx.stroke(); }
-    ctx.globalAlpha = 1;
-    draw(ctx,p,width/2,height*.74,Math.min(width/82,height/93)*.8,0,false);
+    const [bright,dark,trim] = p.colors;
+    const bg = ctx.createLinearGradient(0,0,width,height);
+    bg.addColorStop(0, dark); bg.addColorStop(.58, '#101a34'); bg.addColorStop(1, '#050b18');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,width,height);
+    const glow=ctx.createRadialGradient(width*.52,height*.36,2,width*.52,height*.36,width*.72);
+    glow.addColorStop(0,bright+'bb'); glow.addColorStop(1,bright+'00'); ctx.fillStyle=glow; ctx.fillRect(0,0,width,height);
+    ctx.save(); ctx.globalAlpha=.35; ctx.strokeStyle=trim; ctx.lineWidth=1.2;
+    for(let i=-height;i<width+height;i+=16){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+height*.72,height);ctx.stroke();}
+    ctx.restore();
+    ctx.save(); ctx.translate(width/2,height*.51); ctx.scale(width/108,height/160);
+    ctx.shadowColor=bright; ctx.shadowBlur=selected?22:11;
+    // Shoulder silhouette and a high collar frame the portrait like a character card.
+    ctx.fillStyle=dark; ctx.beginPath(); ctx.moveTo(-57,82); ctx.quadraticCurveTo(-51,35,-25,31); ctx.lineTo(-14,23); ctx.lineTo(14,23); ctx.lineTo(25,31); ctx.quadraticCurveTo(51,35,57,82); ctx.closePath(); ctx.fill();
+    const jacket=ctx.createLinearGradient(-40,20,35,80); jacket.addColorStop(0,bright); jacket.addColorStop(1,dark);
+    ctx.fillStyle=jacket; ctx.beginPath(); ctx.moveTo(-47,78);ctx.lineTo(-38,44);ctx.lineTo(-17,31);ctx.lineTo(0,48);ctx.lineTo(17,31);ctx.lineTo(38,44);ctx.lineTo(47,78);ctx.closePath();ctx.fill();
+    ctx.fillStyle=trim;ctx.beginPath();ctx.moveTo(-17,30);ctx.lineTo(0,47);ctx.lineTo(17,30);ctx.lineTo(10,25);ctx.lineTo(-10,25);ctx.closePath();ctx.fill();
+    // Neck, face and oversized expressive anime eyes.
+    ctx.fillStyle=p.skin;ctx.fillRect(-10,16,20,22);
+    ctx.fillStyle=p.skin;ctx.beginPath();ctx.ellipse(0,-14,31,37,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.ellipse(-12,-23,6,10,-.35,0,Math.PI*2);ctx.fill();
+    // Hair mass with sharp, character-specific bangs.
+    ctx.fillStyle=p.hair;ctx.beginPath();ctx.moveTo(-31,-12);ctx.quadraticCurveTo(-39,-57,-9,-53);ctx.quadraticCurveTo(16,-62,31,-36);ctx.lineTo(29,-7);
+    if(p.style==='spikes'){ctx.lineTo(41,-51);ctx.lineTo(19,-42);ctx.lineTo(10,-63);ctx.lineTo(-2,-43);ctx.lineTo(-22,-58);ctx.lineTo(-17,-34);}
+    else if(p.style==='ears'){ctx.lineTo(37,-52);ctx.lineTo(16,-36);ctx.lineTo(6,-47);ctx.lineTo(-8,-32);ctx.lineTo(-21,-48);}
+    else {ctx.lineTo(19,-26);ctx.lineTo(8,-35);ctx.lineTo(1,-22);ctx.lineTo(-9,-38);ctx.lineTo(-19,-25);}
+    ctx.closePath();ctx.fill();
+    if(p.style==='ponytail'){ctx.fillStyle=p.hair;ctx.beginPath();ctx.moveTo(24,-37);ctx.quadraticCurveTo(58,-34,41,5);ctx.quadraticCurveTo(31,20,25,-4);ctx.closePath();ctx.fill();}
+    if(p.style==='ears'||p.style==='crown'){
+      ctx.fillStyle=p.style==='ears'?p.hair:trim;ctx.beginPath();ctx.moveTo(-20,-43);ctx.lineTo(-32,-78);ctx.lineTo(-5,-51);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(20,-43);ctx.lineTo(32,-78);ctx.lineTo(5,-51);ctx.closePath();ctx.fill();
+      if(p.style==='ears'){ctx.fillStyle='#f49ba8';ctx.beginPath();ctx.moveTo(-24,-54);ctx.lineTo(-29,-70);ctx.lineTo(-15,-54);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(24,-54);ctx.lineTo(29,-70);ctx.lineTo(15,-54);ctx.closePath();ctx.fill();}
+    }
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(-12,-12,8,11,-.08,0,Math.PI*2);ctx.ellipse(12,-12,8,11,.08,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=p.eyes||bright;ctx.beginPath();ctx.ellipse(-11,-10,5.4,8.4,0,0,Math.PI*2);ctx.ellipse(11,-10,5.4,8.4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#101629';ctx.beginPath();ctx.ellipse(-11,-8,2.5,5,0,0,Math.PI*2);ctx.ellipse(11,-8,2.5,5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-13,-14,2.3,0,Math.PI*2);ctx.arc(9,-14,2.3,0,Math.PI*2);ctx.arc(-8,-5,1,0,Math.PI*2);ctx.arc(14,-5,1,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=p.hair;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-21,-27);ctx.lineTo(-7,-29);ctx.moveTo(7,-29);ctx.lineTo(21,-27);ctx.stroke();
+    ctx.strokeStyle='#a95556';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-3,3);ctx.quadraticCurveTo(0,6,4,3);ctx.stroke();
+    if(p.style==='headband'||p.style==='bandana'){ctx.fillStyle=trim;ctx.beginPath();ctx.roundRect(-30,-39,60,7,3);ctx.fill();ctx.fillRect(25,-36,16,4);}
+    if(p.style==='visor'||p.style==='helmet'||p.style==='crown'){ctx.fillStyle=p.style==='visor'?'#b7eaf2':trim;ctx.beginPath();ctx.roundRect(-31,-43,62,10,4);ctx.fill();if(p.style==='visor'){ctx.fillStyle='rgba(42,90,117,.7)';ctx.beginPath();ctx.roundRect(-27,-41,54,6,3);ctx.fill();}}
+    ctx.shadowBlur=0;ctx.fillStyle=trim;ctx.font='900 9px sans-serif';ctx.textAlign='right';ctx.fillText(p.sigil,48,73);
+    ctx.restore();
+    // Foil slash and top rank plate.
+    const shine=ctx.createLinearGradient(0,0,width,height);shine.addColorStop(0,'#ffffff00');shine.addColorStop(.48,'#ffffff00');shine.addColorStop(.53,'#ffffff38');shine.addColorStop(.58,'#ffffff00');shine.addColorStop(1,'#ffffff00');
+    ctx.fillStyle=shine;ctx.fillRect(0,0,width,height);
+    ctx.strokeStyle=bright;ctx.globalAlpha=selected?.95:.55;ctx.lineWidth=selected?2.5:1.2;ctx.strokeRect(2,2,width-4,height-4);ctx.globalAlpha=1;
   }
   return { roster, byId, draw, paintPortrait };
 });

@@ -267,6 +267,9 @@ class OnlineArena {
       card.type = 'button';
       card.className = `keeper-card${selected ? ' is-equipped' : ''}${unlocked ? '' : ' is-locked'}`;
       card.dataset.keeperId = keeper.id;
+      card.dataset.rarity = keeper.unlockRating >= 2000 ? 'legendary' : keeper.unlockRating >= 1600 ? 'epic' : keeper.unlockRating >= 1200 ? 'rare' : 'starter';
+      card.style.setProperty('--keeper-accent', keeper.colors[0]);
+      card.style.setProperty('--keeper-trim', keeper.colors[2]);
       card.disabled = !unlocked || selected || !this.user;
       card.setAttribute('aria-label', `${keeper.name}: ${unlocked ? (selected ? 'equipado' : 'seleccionar') : `se desbloquea con ${keeper.unlockRating} puntos`}`);
       const portrait = document.createElement('canvas');
