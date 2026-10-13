@@ -20,7 +20,7 @@
   };
   const cardArt = typeof Image !== 'undefined' ? new Image() : null;
   if (cardArt) {
-    cardArt.src = './assets/goalkeeper-cutouts.png';
+    cardArt.src = './assets/goalkeeper-models.png';
     cardArt.onload = () => document.querySelectorAll('.keeper-card__portrait').forEach(canvas =>
       paintPortrait(canvas, canvas.dataset.keeperId, canvas.parentElement.classList.contains('is-equipped')));
   }
@@ -28,48 +28,84 @@
   function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0) {
     if (!cardArt?.complete || !cardArt.naturalWidth) return;
     const p = byId(keeper);
-    const cellWidth = cardArt.naturalWidth / 4;
-    const cellHeight = cardArt.naturalHeight / 2;
-    const sourceX = (p.artIndex % 4) * cellWidth;
-    const sourceY = Math.floor(p.artIndex / 4) * cellHeight;
-    const spriteScale = scale * .22;
-    const drawWidth = cellWidth * spriteScale;
-    const drawHeight = cellHeight * spriteScale;
-    const direction = diveDirection || (diveRotation < 0 ? -1 : 1);
+    const frameSize = 256;
+    const spriteScale = scale * .68;
+    const direction = diveDirection || Math.sign(diveRotation);
     const motion = Math.max(0, Math.min(1, diveProgress));
     const landing = ['saved', 'beaten'].includes(keeperState) ? Math.max(0, 1 - landingTimer / .58) : 0;
     const idlePhase = time * [1.2, 2.7, 1.1, .8, 1.9, 1.35, 1.05, .9][p.artIndex];
-    const anticipationTilt = anticipating ? direction * .045 : 0;
-    const diveTilt = diving ? Math.max(-.14, Math.min(.14, diveRotation * .16)) : 0;
-    const landingTilt = landing * diveRotation * .08;
-    const breathing = Math.sin(idlePhase) * .8;
+    const breath = Math.sin(idlePhase);
+    const diveFrame = direction < 0 ? 2 : direction > 0 ? 3 : 1;
     const footX = x + (diving ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
-    const footY = y + 40 + breathing - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
-    // The source art is the actual roster character. Anchor its feet to the pitch
-    // and animate the whole illustration, preserving its face, kit, and silhouette.
-    const top = footY - cellHeight * .9 * spriteScale;
-    const left = footX - drawWidth / 2;
+    const footY = y + 40 + breath * .8 - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
+
+    const drawPose = (pose, alpha, offsetX = 0, offsetY = 0, angle = 0) => {
+      if (alpha <= .01) return;
+      const sourceX = pose * frameSize;
+      const sourceY = p.artIndex * frameSize;
+      const standing = pose < 2;
+      const anchorX = x + offsetX;
+      const anchorY = standing ? footY + offsetY : y - 28 + offsetY;
+      const left = anchorX - frameSize * spriteScale / 2;
+      const top = standing
+        ? anchorY - 244 * spriteScale
+        : anchorY - frameSize * spriteScale / 2;
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      ctx.translate(anchorX, anchorY);
+      ctx.rotate(angle);
+      ctx.translate(-anchorX, -anchorY);
+      ctx.drawImage(cardArt, sourceX, sourceY, frameSize, frameSize, left, top, frameSize * spriteScale, frameSize * spriteScale);
+      ctx.restore();
+    };
 
     ctx.save();
     ctx.globalAlpha = .42;
     ctx.fillStyle = '#020916';
     ctx.beginPath();
-    ctx.ellipse(footX, y + 40, 24 + motion * 8, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(footX, y + 40, 24 + (diving ? 12 : 0), 5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    if (diving && motion < .72) {
+    if (diving) {
       ctx.save();
-      ctx.globalAlpha = .13 * (1 - motion);
-      ctx.translate(-direction * 10, -3);
-      ctx.drawImage(cardArt, sourceX, sourceY, cellWidth, cellHeight, left, top, drawWidth, drawHeight);
+      ctx.globalAlpha = .16 + motion * .18;
+      ctx.strokeStyle = p.colors[0];
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const streakY = y - 58 + i * 19;
+        const length = 18 + motion * (18 + (i % 3) * 6);
+        ctx.beginPath();
+        ctx.moveTo(footX - direction * 10, streakY);
+        ctx.lineTo(footX - direction * (10 + length), streakY - 4 + (i % 2) * 7);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (landing > .78) {
+      ctx.save();
+      ctx.globalAlpha = (landing - .78) * 1.8;
+      ctx.strokeStyle = p.colors[0];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x, y + 40, 27 + (1 - landing) * 30, 5 + (1 - landing) * 4, 0, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 
-    ctx.save();
-    ctx.translate(footX, footY);
-    ctx.rotate(anticipationTilt + diveTilt + landingTilt + Math.sin(idlePhase) * .008);
-    ctx.translate(-footX, -footY);
+    if (diving) {
+      const diveBlend = Math.min(1, motion / .16);
+      drawPose(1, 1 - diveBlend, 0, -2, direction * -.025);
+      if (motion > .12) drawPose(diveFrame, .1 * (1 - motion), -direction * 20, 6, direction * -.04);
+      drawPose(diveFrame, diveBlend, 0, -Math.sin(motion * Math.PI) * 5, direction * -.035);
+    } else if (landing > 0) {
+      drawPose(diveFrame, landing, 0, 0, diveRotation * .035 * landing);
+      drawPose(0, 1 - landing, 0, 0, 0);
+    } else if (anticipating) {
+      drawPose(1, 1, 0, -2, direction * -.025);
+    } else {
+      drawPose(0, 1, 0, -Math.abs(breath) * 1.2, Math.sin(idlePhase * .5) * .008);
+    }
+
     if (anticipating) {
       ctx.save();
       ctx.globalAlpha = .18 + Math.sin(time * 24) * .05;
@@ -79,9 +115,16 @@
       ctx.ellipse(footX, y + 36, 29 + Math.sin(time * 18) * 2, 7, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    } else if (!diving && landing <= 0) {
+      ctx.save();
+      ctx.globalAlpha = .055 + (breath + 1) * .025;
+      ctx.strokeStyle = p.colors[0];
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(footX, y + 39, 27 + breath * 1.5, 6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
-    ctx.drawImage(cardArt, sourceX, sourceY, cellWidth, cellHeight, left, top, drawWidth, drawHeight);
-    ctx.restore();
   }
 
   function paintPortrait(canvas, keeper, selected = false) {
@@ -93,18 +136,15 @@
     const p = byId(keeper);
     canvas.dataset.keeperId = p.id;
     if (cardArt?.complete && cardArt.naturalWidth) {
-      const cellWidth = cardArt.naturalWidth / 4;
-      const cellHeight = cardArt.naturalHeight / 2;
-      const sourceHeight = Math.min(cellHeight, cellWidth * height / width);
-      const sourceX = (p.artIndex % 4) * cellWidth;
-      const sourceY = Math.floor(p.artIndex / 4) * cellHeight;
+      const frameSize = 256;
+      const sourceY = p.artIndex * frameSize;
       const bg = ctx.createLinearGradient(0, 0, width, height);
       bg.addColorStop(0, '#12344b'); bg.addColorStop(.52, p.colors[1]); bg.addColorStop(1, '#07111e');
       ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
       const glow = ctx.createRadialGradient(width * .5, height * .32, 2, width * .5, height * .32, width * .8);
       glow.addColorStop(0, `${p.colors[0]}99`); glow.addColorStop(1, `${p.colors[0]}00`);
       ctx.fillStyle = glow; ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(cardArt, sourceX, sourceY, cellWidth, sourceHeight, 0, 0, width, height);
+      ctx.drawImage(cardArt, 44, sourceY + 8, 168, 234, 0, 0, width, height);
       const shade = ctx.createLinearGradient(0, height * .55, 0, height);
       shade.addColorStop(0, 'rgba(3,12,26,0)'); shade.addColorStop(1, 'rgba(3,12,26,.42)');
       ctx.fillStyle = shade; ctx.fillRect(0, 0, width, height);
