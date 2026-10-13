@@ -192,6 +192,11 @@ class PenaltisGame {
   }
 
   setOnlineTurn(turnMessage) {
+    if (this.isOnlineMode && this.ball?.inFlight) {
+      this.pendingOnlineTurn = turnMessage;
+      return;
+    }
+    this.pendingOnlineTurn = null;
     this.onlineRole = turnMessage.role === 'shooter' ? 'lanzador' : 'portero';
     this.state = 'aiming';
     this.activeZone = null;
@@ -208,13 +213,10 @@ class PenaltisGame {
 
   triggerOnlineShotAnimation(shooterZoneId, keeperZoneId, turnRole, isGoal) {
     const targetZone = this.TARGET_ZONES.find(z => z.id === shooterZoneId) || this.TARGET_ZONES[2];
+    this.onlineVisualTurnRole = turnRole;
+    this.onlineVisualIsGoal = isGoal;
+    this.ball.flightTime = 0.42;
     this.launchAnimeShot(targetZone, keeperZoneId);
-    
-    setTimeout(() => {
-      if (this.isOnlineMode) {
-        this.resolveOnlineVisualOutcomeDirect(turnRole, isGoal);
-      }
-    }, 600);
   }
   // ----------------------
 
@@ -583,6 +585,10 @@ class PenaltisGame {
   }
 
   launchAnimeShot(zone, keeperChoiceId = null) {
+    this.feedbackAlpha = 0;
+    this.feedbackAge = 0;
+    this.feedbackTitle = '';
+    this.feedbackSubtext = '';
     this.state = 'shooting';
     this.ball.inFlight = true;
     this.ball.progress = 0;
@@ -710,7 +716,9 @@ class PenaltisGame {
         if (!this.isOnlineMode) {
           this.resolveAnimePenalty();
         } else {
-          this.resolveOnlineVisualOutcome();
+          this.resolveOnlineVisualOutcomeDirect(this.onlineVisualTurnRole, this.onlineVisualIsGoal);
+          this.state = 'aiming';
+          if (this.pendingOnlineTurn) this.setOnlineTurn(this.pendingOnlineTurn);
         }
       }
     }
@@ -732,8 +740,13 @@ class PenaltisGame {
     }
 
     if (this.feedbackAlpha > 0) {
-      this.feedbackAlpha -= dt * 0.7;
-      this.feedbackScale += dt * 0.35;
+      this.feedbackAge += dt;
+      const popProgress = Math.min(1, this.feedbackAge / 0.14);
+      this.feedbackScale = 0.72 + 0.28 * (1 - Math.pow(1 - popProgress, 3))
+        + Math.sin(this.feedbackAge * 25) * Math.exp(-this.feedbackAge * 13) * 0.08;
+      this.feedbackAlpha = this.feedbackAge < 0.48
+        ? 1
+        : Math.max(0, 1 - (this.feedbackAge - 0.48) / 0.24);
     }
   }
 
@@ -870,8 +883,9 @@ class PenaltisGame {
     this.feedbackTitle = title;
     this.feedbackSubtext = subtitle;
     this.feedbackColor = color;
-    this.feedbackAlpha = 3.0;
-    this.feedbackScale = 1.0;
+    this.feedbackAlpha = 1;
+    this.feedbackAge = 0;
+    this.feedbackScale = 0.72;
   }
 
   resetNextShot() {
@@ -1476,28 +1490,78 @@ class PenaltisGame {
 
   renderMangaBanner(ctx) {
     if (this.feedbackAlpha <= 0) return;
+    const age = this.feedbackAge || 0;
+    const burstProgress = Math.min(1, age / 0.52);
     ctx.save();
     ctx.translate(200, 285);
     ctx.scale(this.feedbackScale, this.feedbackScale);
     ctx.globalAlpha = Math.max(0, this.feedbackAlpha);
 
     ctx.save();
-    ctx.rotate(-0.04);
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
-    ctx.fillRect(-180, -32, 360, 72);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha *= 0.72 * (1 - burstProgress);
+    ctx.rotate(age * 0.7);
+    ctx.beginPath();
+    ctx.arc(0, 0, 44 + burstProgress * 122, 0, Math.PI * 2);
     ctx.strokeStyle = this.feedbackColor;
-    ctx.lineWidth = 3.5;
-    ctx.strokeRect(-180, -32, 360, 72);
+    ctx.lineWidth = 8 * (1 - burstProgress) + 1;
+    ctx.shadowColor = this.feedbackColor;
+    ctx.shadowBlur = 24;
+    ctx.stroke();
+    for (let ray = 0; ray < 14; ray++) {
+      const angle = (Math.PI * 2 * ray) / 14 + age * 0.35;
+      const inner = 112 + (ray % 3) * 9;
+      const outer = inner + 28 + (1 - burstProgress) * 28;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+      ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+      ctx.lineWidth = ray % 2 ? 2 : 4;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.rotate(-0.035);
+    ctx.shadowColor = this.feedbackColor;
+    ctx.shadowBlur = 24;
+    const plate = ctx.createLinearGradient(0, -38, 0, 40);
+    plate.addColorStop(0, 'rgba(17, 31, 49, 0.97)');
+    plate.addColorStop(0.55, 'rgba(3, 12, 25, 0.97)');
+    plate.addColorStop(1, 'rgba(9, 20, 35, 0.97)');
+    ctx.fillStyle = plate;
+    ctx.beginPath();
+    ctx.moveTo(-166, -38); ctx.lineTo(166, -38); ctx.lineTo(182, -22);
+    ctx.lineTo(182, 23); ctx.lineTo(166, 39); ctx.lineTo(-166, 39);
+    ctx.lineTo(-182, 23); ctx.lineTo(-182, -22); ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = this.feedbackColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha *= 0.7;
+    ctx.fillStyle = this.feedbackColor;
+    ctx.beginPath();
+    ctx.moveTo(-176, -25); ctx.lineTo(-166, -35); ctx.lineTo(-166, -12); ctx.lineTo(-176, -3); ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(176, 25); ctx.lineTo(166, 35); ctx.lineTo(166, 12); ctx.lineTo(176, 3); ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha /= 0.7;
 
     ctx.fillStyle = this.feedbackColor;
-    ctx.font = '900 26px Fredoka, sans-serif';
+    ctx.shadowColor = this.feedbackColor;
+    ctx.shadowBlur = 16;
+    ctx.font = '900 31px "Barlow Condensed", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(this.feedbackTitle, 0, 2);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.feedbackTitle, 0, -9, 320);
 
     if (this.feedbackSubtext) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 13px Fredoka, sans-serif';
-      ctx.fillText(this.feedbackSubtext, 0, 26);
+      ctx.fillStyle = '#f8fafc';
+      ctx.shadowBlur = 0;
+      ctx.font = '700 11px "Chakra Petch", sans-serif';
+      ctx.fillText(this.feedbackSubtext, 0, 17, 320);
     }
     ctx.restore();
     ctx.restore();
