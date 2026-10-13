@@ -39,8 +39,8 @@ Plataforma web de minijuegos de fútbol orientada a móviles y diseñada especia
 
 ## 🏆 Competición online
 
-- Partidas Ranked 1 vs 1 con tres penaltis por jugador y muerte súbita por parejas de tiros.
-- Búsqueda automática de rival; si nadie se une en 10 segundos, se inicia una partida contra la máquina. Ambas cuentan para el ranking.
+- Partidas online 1 vs 1 con tres penaltis por jugador y muerte súbita por parejas de tiros.
+- La búsqueda empareja a dos jugadores reales y continúa hasta encontrar rival o hasta que se cancele.
 - Partidas amistosas mediante código de invitación, sin cambios de rating.
 - Cuentas con nickname y avatar, clasificación global, sesiones y resultados guardados en SQLite.
 - El backend usa Node.js 22.13 o posterior, SQLite integrado (`node:sqlite`) y WebSockets (`ws`).
@@ -95,3 +95,9 @@ Las pistas se sirven desde Wikimedia Commons; los enlaces de cada nivel llevan a
 
 3. **En el móvil en la misma red Wi-Fi**:
    - Abre la dirección IP local de tu ordenador con el puerto (ej: `http://192.168.1.XX:5500`) en el navegador de tu teléfono móvil o tablet.
+
+## Despliegue en Vercel
+
+El proyecto incluye funciones en `api/` para cuentas, ranking y partidas. En Vercel, conecta el proyecto con una base de datos Neon y configura `DATABASE_URL` en **Settings > Environment Variables** para Production y Preview. Después, vuelve a desplegar. Las cuentas y partidas online se guardan en Neon; el juego consulta estas funciones periódicamente para que el estado de una partida se comparta entre distintas instancias.
+
+Comprueba en el dominio `https://...vercel.app` que puedes registrar/iniciar sesión, ver el ranking, abrir una invitación con dos cuentas y terminar una tanda. Los partidos clasificatorios suman 24 puntos al ganador y restan 24 al otro jugador (sin bajar de cero); las amistosas no cambian el rating. Si aparece un error de base de datos, confirma que `DATABASE_URL` está disponible para el entorno de ese despliegue y vuelve a desplegar tras modificar variables.

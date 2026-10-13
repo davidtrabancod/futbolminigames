@@ -4,6 +4,12 @@ class OnlineArena {
     this.user = null;
     this.socket = null;
     this.socketPromise = null;
+    this.useServerlessMatchApi = window.location.protocol === 'https:';
+    this.matchPollTimer = null;
+    this.matchPollInFlight = false;
+    this.matchPollStopped = true;
+    this.matchId = null;
+    this.matchEventCursor = 0;
     this.authMode = 'login';
     this.selectedAvatar = '⚽';
     this.playerIndex = 0;
@@ -39,7 +45,6 @@ class OnlineArena {
       inviteCode: document.getElementById('inviteCode'),
       copyInviteBtn: document.getElementById('copyInviteBtn'),
       cancelOnlineBtn: document.getElementById('cancelOnlineBtn'),
-      backToWorldTourBtn: document.getElementById('backToWorldTourBtn'),
       leaderboardList: document.getElementById('leaderboardList'),
       onlineMatchScreen: document.getElementById('onlineMatchScreen'),
       onlineMatchMode: document.getElementById('onlineMatchMode'),
@@ -61,15 +66,20 @@ class OnlineArena {
       onlineShotResult: document.getElementById('onlineShotResult'),
       forfeitOnlineBtn: document.getElementById('forfeitOnlineBtn'),
       onlineMatchResult: document.getElementById('onlineMatchResult'),
+      onlineResultMode: document.getElementById('onlineResultMode'),
       onlineResultIcon: document.getElementById('onlineResultIcon'),
       onlineResultTitle: document.getElementById('onlineResultTitle'),
       onlineResultSummary: document.getElementById('onlineResultSummary'),
-      onlineRatingChange: document.getElementById('onlineRatingChange')
+      onlineRatingChange: document.getElementById('onlineRatingChange'),
+      onlineResultYouName: document.getElementById('onlineResultYouName'),
+      onlineResultYouScore: document.getElementById('onlineResultYouScore'),
+      onlineResultOpponentName: document.getElementById('onlineResultOpponentName'),
+      onlineResultOpponentScore: document.getElementById('onlineResultOpponentScore'),
+      onlineResultRecord: document.getElementById('onlineResultRecord')
     };
 
     this.bindEvents();
     this.loadCurrentUser();
-    this.loadLeaderboard();
   }
 
   bindEvents() {
@@ -100,15 +110,19 @@ class OnlineArena {
     });
     this.refs.copyInviteBtn.addEventListener('click', () => this.copyInviteCode());
     this.refs.cancelOnlineBtn.addEventListener('click', () => this.cancelQueue());
-    this.refs.backToWorldTourBtn.addEventListener('click', () => {
-      document.getElementById('worldTourLevels').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
     document.getElementById('refreshLeaderboardBtn').addEventListener('click', () => this.loadLeaderboard());
 
     this.refs.forfeitOnlineBtn.addEventListener('click', () => {
       if (!this.matchActive || !window.confirm('¿Seguro que quieres abandonar la partida? Se contará como derrota.')) return;
-      this.send({ type: 'forfeit' });
       this.refs.forfeitOnlineBtn.disabled = true;
+      if (this.useServerlessMatchApi) {
+        this.requestMatchApi({ action: 'forfeit', matchId: this.matchId }).catch(error => {
+          this.refs.forfeitOnlineBtn.disabled = false;
+          this.setOnlineStatus(error.message, 'error');
+        });
+      } else {
+        this.send({ type: 'forfeit' });
+      }
     });
     document.getElementById('onlinePlayAgainBtn').addEventListener('click', () => {
       this.refs.onlineMatchResult.classList.add('hidden');
@@ -140,6 +154,24 @@ class OnlineArena {
     try {
       const { user } = await this.api('/api/me');
       this.setUser(user);
+      if (user && this.useServerlessMatchApi) await this.resumeServerlessMatch();
+    } catch (error) {}
+    await this.loadLeaderboard();
+  }
+
+  async resumeServerlessMatch() {
+    try {
+      const state = await this.requestMatchApi({ action: 'poll', cursor: 0 });
+      if (!['queued', 'waiting', 'active'].includes(state.status)) return;
+      if (state.mode) this.currentMode = state.mode;
+      if (state.code) {
+        this.refs.inviteCode.textContent = state.code;
+        this.refs.invitePanel.classList.remove('hidden');
+      }
+      this.refs.cancelOnlineBtn.classList.remove('hidden');
+      this.refs.rankedMatchBtn.disabled = true;
+      this.refs.createFriendlyBtn.disabled = true;
+      this.startMatchPolling(state.matchId || null);
     } catch (error) {}
   }
 
@@ -147,13 +179,16 @@ class OnlineArena {
     try {
       const { entries } = await this.api('/api/leaderboard');
       this.refs.leaderboardList.replaceChildren();
-      if (!entries.length) {
-        this.refs.leaderboardList.append(this.makeLeaderboardMessage('¡Sé el primero en jugar!'));
+      const topTen = entries.slice(0, 10);
+      if (!topTen.length) {
+        this.refs.leaderboardList.append(this.makeLeaderboardMessage('Aún no hay jugadores en la clasificación. ¡Sé el primero en competir!'));
       } else {
-        entries.forEach(entry => this.refs.leaderboardList.append(this.makeLeaderboardRow(entry)));
+        topTen.forEach(entry => this.refs.leaderboardList.append(this.makeLeaderboardRow(entry)));
       }
       if (this.user) this.updateRankBadge(this.user);
-    } catch {}
+    } catch {
+      this.refs.leaderboardList.replaceChildren(this.makeLeaderboardMessage('No se pudo cargar el ranking. Inténtalo de nuevo más tarde.'));
+    }
   }
 
   makeLeaderboardMessage(text) {
@@ -166,9 +201,12 @@ class OnlineArena {
   makeLeaderboardRow(entry) {
     const row = document.createElement('li');
     row.className = 'leaderboard__row';
+    if (entry.rank <= 3) row.classList.add(`leaderboard__row--rank-${entry.rank}`);
+    if (this.user && this.user.nickname === entry.nickname) row.classList.add('is-current-player');
     const position = document.createElement('span');
     position.className = 'leaderboard__position';
     position.textContent = entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : `#${entry.rank}`;
+    if (entry.rank <= 3) position.setAttribute('aria-label', ['1.º puesto, oro', '2.º puesto, plata', '3.º puesto, bronce'][entry.rank - 1]);
     const identity = document.createElement('span');
     identity.className = 'leaderboard__identity';
     const avatar = document.createElement('span');
@@ -184,7 +222,15 @@ class OnlineArena {
   }
 
   setUser(user) {
+    const previousRating = this.user?.rating;
     this.user = user || null;
+    const ratingCount = document.getElementById('headerRatingCount');
+    if (ratingCount) ratingCount.textContent = this.user ? this.user.rating.toLocaleString('es-ES') : '—';
+    ratingCount?.parentElement.classList.remove('is-up', 'is-down', 'is-updating');
+    if (ratingCount && previousRating !== undefined && this.user && previousRating !== this.user.rating) {
+      ratingCount.parentElement.classList.add(this.user.rating > previousRating ? 'is-up' : 'is-down', 'is-updating');
+      window.setTimeout(() => ratingCount.parentElement.classList.remove('is-updating'), 850);
+    }
     if (this.user) {
       this.refs.profileAvatar.textContent = this.user.avatar;
       this.refs.profileNickname.textContent = this.user.nickname;
@@ -192,6 +238,10 @@ class OnlineArena {
     } else {
       this.refs.profileAvatar.textContent = '👤';
       this.refs.profileNickname.textContent = 'Entrar';
+      const rankValue = document.querySelector('.game-card__rank .game-card__stat-value');
+      const rankStatus = document.querySelector('.game-card__rank-status');
+      if (rankValue) rankValue.textContent = '—';
+      if (rankStatus) rankStatus.textContent = 'Inicia sesión para competir';
     }
   }
 
@@ -200,6 +250,12 @@ class OnlineArena {
     const rankStatus = document.querySelector('.game-card__rank-status');
     if (rankValue) rankValue.textContent = `#${user.rank}`;
     if (rankStatus) rankStatus.textContent = `${user.rating} puntos`;
+  }
+
+  setOnlineStatus(message, state = '') {
+    this.refs.onlineStatus.textContent = message;
+    this.refs.onlineStatus.classList.toggle('is-error', state === 'error');
+    this.refs.onlineStatus.classList.toggle('is-success', state === 'success');
   }
 
   openProfile() {
@@ -308,31 +364,126 @@ class OnlineArena {
     return true;
   }
 
+  async requestMatchApi(body) {
+    return this.api('/api/match', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  startMatchPolling(matchId = null) {
+    this.stopMatchPolling();
+    this.matchId = matchId;
+    this.matchEventCursor = 0;
+    this.matchPollStopped = false;
+    this.pollMatchApi();
+  }
+
+  stopMatchPolling() {
+    this.matchPollStopped = true;
+    this.matchPollInFlight = false;
+    if (this.matchPollTimer) window.clearTimeout(this.matchPollTimer);
+    this.matchPollTimer = null;
+  }
+
+  async pollMatchApi() {
+    if (this.matchPollStopped || this.matchPollInFlight) return;
+    this.matchPollInFlight = true;
+    let nextDelay = 1100;
+    try {
+      const state = await this.requestMatchApi({
+        action: 'poll',
+        matchId: this.matchId,
+        cursor: this.matchEventCursor
+      });
+      if (state.matchId) this.matchId = state.matchId;
+      if (state.mode) this.currentMode = state.mode;
+      if (state.code) {
+        this.refs.inviteCode.textContent = state.code;
+        this.refs.invitePanel.classList.remove('hidden');
+      }
+      for (const message of state.events || []) {
+        this.matchEventCursor = Math.max(this.matchEventCursor, Number(message.eventId) || 0);
+        this.handleSocketMessage({ data: JSON.stringify(message) });
+      }
+      if (Number.isSafeInteger(Number(state.cursor))) {
+        this.matchEventCursor = Math.max(this.matchEventCursor, Number(state.cursor));
+      }
+      if (state.progress) this.showActionProgress(state.progress);
+
+      if (state.status === 'queued') this.setOnlineStatus('Buscando rival. Te avisaremos en cuanto empiece el duelo.');
+      if (state.status === 'waiting' && this.currentMode === 'friendly') this.setOnlineStatus('Invitación lista. Esperando a tu amigo.');
+      if (state.status === 'finished' || state.status === 'expired' || state.status === 'cancelled' || state.status === 'idle') {
+        this.stopMatchPolling();
+        if (state.status !== 'finished') this.resetOnlineControls();
+        return;
+      }
+    } catch (error) {
+      nextDelay = 2200;
+      if (error.message.includes('Inicia sesión')) {
+        this.stopMatchPolling();
+        this.resetOnlineControls();
+      } else if (this.matchActive) {
+        this.setOnlineStatus('Reconectando con el servidor de la partida…', 'error');
+      } else {
+        this.setOnlineStatus(error.message, 'error');
+        this.stopMatchPolling();
+        this.resetOnlineControls();
+      }
+    } finally {
+      this.matchPollInFlight = false;
+      if (!this.matchPollStopped) this.matchPollTimer = window.setTimeout(() => this.pollMatchApi(), nextDelay);
+    }
+  }
+
+  resetOnlineControls() {
+    this.refs.cancelOnlineBtn.classList.add('hidden');
+    this.refs.rankedMatchBtn.disabled = false;
+    this.refs.createFriendlyBtn.disabled = false;
+    this.refs.forfeitOnlineBtn.disabled = false;
+  }
+
   async startRankedQueue() {
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
+    this.setOnlineStatus('Buscando un jugador real. La búsqueda seguirá activa hasta encontrar rival.');
     try {
+      if (this.useServerlessMatchApi) {
+        const result = await this.requestMatchApi({ action: 'queue' });
+        if (result.matchId) this.startMatchPolling(result.matchId);
+        else this.startMatchPolling();
+        return;
+      }
       await this.ensureSocket();
       this.send({ type: 'queue-ranked' });
     } catch (error) {
       this.refs.cancelOnlineBtn.classList.add('hidden');
       this.refs.rankedMatchBtn.disabled = false;
       this.refs.createFriendlyBtn.disabled = false;
+      this.setOnlineStatus('No se pudo conectar con el servicio de partidas online.', 'error');
     }
   }
 
   async createFriendlyMatch() {
+    this.currentMode = 'friendly';
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
+    this.setOnlineStatus('Preparando una invitación para tu amigo.');
     try {
+      if (this.useServerlessMatchApi) {
+        const result = await this.requestMatchApi({ action: 'invite' });
+        this.refs.inviteCode.textContent = result.code;
+        this.refs.invitePanel.classList.remove('hidden');
+        this.setOnlineStatus('Invitación lista. Comparte el código con tu amigo.', 'success');
+        this.startMatchPolling(result.matchId);
+        return;
+      }
       await this.ensureSocket();
       this.send({ type: 'create-invite' });
     } catch (error) {
       this.refs.cancelOnlineBtn.classList.add('hidden');
       this.refs.rankedMatchBtn.disabled = false;
       this.refs.createFriendlyBtn.disabled = false;
+      this.setOnlineStatus('No se pudo crear la invitación.', 'error');
     }
   }
 
@@ -342,17 +493,33 @@ class OnlineArena {
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
+    this.setOnlineStatus('Conectando con la partida…');
     try {
+      if (this.useServerlessMatchApi) {
+        const result = await this.requestMatchApi({ action: 'join-invite', code });
+        this.currentMode = 'friendly';
+        this.startMatchPolling(result.matchId);
+        return;
+      }
       await this.ensureSocket();
       this.send({ type: 'join-invite', code });
     } catch (error) {
       this.refs.cancelOnlineBtn.classList.add('hidden');
       this.refs.rankedMatchBtn.disabled = false;
       this.refs.createFriendlyBtn.disabled = false;
+      this.setOnlineStatus('No se pudo conectar con la partida.', 'error');
     }
   }
 
   cancelQueue() {
+    if (this.useServerlessMatchApi) {
+      this.stopMatchPolling();
+      this.requestMatchApi({ action: 'cancel' }).catch(() => {});
+      this.resetOnlineControls();
+      this.setOnlineStatus('Búsqueda cancelada. Puedes volver a buscar rival.');
+      this.refs.invitePanel.classList.add('hidden');
+      return;
+    }
     this.send({ type: 'cancel' });
   }
 
@@ -370,12 +537,26 @@ class OnlineArena {
       case 'invite-created':
         this.refs.inviteCode.textContent = message.code;
         this.refs.invitePanel.classList.remove('hidden');
+        this.setOnlineStatus('Invitación lista. Comparte el código con tu amigo.', 'success');
+        break;
+      case 'queue-wait':
+        this.setOnlineStatus('Buscando a otro jugador online…');
+        break;
+      case 'queue-matched':
+        this.setOnlineStatus('Rival encontrado. Preparando el duelo…', 'success');
         break;
       case 'cancelled':
         this.refs.cancelOnlineBtn.classList.add('hidden');
         this.refs.rankedMatchBtn.disabled = false;
         this.refs.createFriendlyBtn.disabled = false;
         this.refs.invitePanel.classList.add('hidden');
+        this.setOnlineStatus('Búsqueda cancelada. Puedes volver a buscar rival.');
+        break;
+      case 'error':
+        this.refs.cancelOnlineBtn.classList.add('hidden');
+        this.refs.rankedMatchBtn.disabled = false;
+        this.refs.createFriendlyBtn.disabled = false;
+        this.setOnlineStatus(message.message || 'No se pudo completar la acción.', 'error');
         break;
       case 'match-start':
         this.beginMatch(message);
@@ -396,13 +577,26 @@ class OnlineArena {
   }
 
   beginMatch(message) {
+    if (message.matchId) this.matchId = message.matchId;
     this.currentMode = message.mode;
     this.playerIndex = message.playerIndex;
     this.matchActive = true;
     this.actionSubmitted = false;
+    this.refs.onlineMatchMode.textContent = message.mode === 'friendly' ? 'AMISTOSA' : 'CLASIFICATORIA';
+
+    const you = message.you || this.user || {};
+    const opponent = message.opponent || {};
+    this.refs.onlineYouAvatar.textContent = you.avatar || '⚽';
+    this.refs.onlineYouName.textContent = you.nickname || 'Tú';
+    this.refs.onlineYouMeta.textContent = `${you.rating ?? 1000} pts`;
+    this.refs.onlineOpponentAvatar.textContent = opponent.avatar || '⚽';
+    this.refs.onlineOpponentName.textContent = opponent.nickname || 'Rival';
+    this.refs.onlineOpponentMeta.textContent = `${opponent.rating ?? 1000} pts`;
 
     if (this.app.gameScreen) this.app.gameScreen.classList.remove('hidden');
-    if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.add('hidden');
+    if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.remove('hidden');
+    this.refs.onlineMatchResult.classList.add('hidden');
+    this.refs.cancelOnlineBtn.classList.add('hidden');
     if (this.app.menuScreen) this.app.menuScreen.classList.add('hidden');
     if (this.app.worldTourScreen) this.app.worldTourScreen.classList.add('hidden');
 
@@ -488,6 +682,14 @@ class OnlineArena {
 
   submitZoneAction(zoneId) {
     if (!this.currentRole || this.actionSubmitted) return;
+    if (this.useServerlessMatchApi) {
+      this.actionSubmitted = true;
+      this.requestMatchApi({ action: 'action', matchId: this.matchId, zone: zoneId }).catch(error => {
+        this.actionSubmitted = false;
+        this.setOnlineStatus(error.message, 'error');
+      });
+      return;
+    }
     if (!this.send({ type: 'action', zone: zoneId })) return;
     this.actionSubmitted = true;
   }
@@ -544,12 +746,56 @@ class OnlineArena {
   }
 
   showOnlineResult(message) {
+    this.stopMatchPolling();
     this.matchActive = false;
     this.currentRole = null;
-    if (this.refs.onlineMatchResult) this.refs.onlineMatchResult.classList.remove('hidden');
-    if (this.refs.onlineResultTitle) {
-      this.refs.onlineResultTitle.textContent = message.result === 'win' ? '¡Victoria!' : message.result === 'draw' ? 'Empate' : 'Derrota';
+    this.resetOnlineControls();
+    this.refs.invitePanel.classList.add('hidden');
+    const won = message.result === 'win';
+    const draw = message.result === 'draw';
+    const opponent = message.opponent || {};
+    const scores = message.scores || [0, 0];
+    const youScore = scores[this.playerIndex] ?? 0;
+    const opponentScore = scores[1 - this.playerIndex] ?? 0;
+    const rating = message.rating || {};
+    const delta = Number(rating.delta) || 0;
+    const updatedUser = message.user || this.user;
+    const ranked = message.mode === 'ranked';
+
+    if (updatedUser) this.setUser(updatedUser);
+    this.app.gameState = 'online-result';
+    this.app.gameScreen?.classList.add('hidden');
+    this.refs.onlineMatchResult.classList.remove('hidden', 'is-win', 'is-loss', 'is-draw');
+    this.refs.onlineMatchResult.classList.add(won ? 'is-win' : draw ? 'is-draw' : 'is-loss');
+
+    this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : 'PARTIDA AMISTOSA';
+    this.refs.onlineResultIcon.textContent = won ? '🏆' : draw ? '🤝' : '⚡';
+    this.refs.onlineResultTitle.textContent = won ? '¡Victoria!' : draw ? 'Empate' : 'Derrota';
+    let reason = '';
+    if (message.reason === 'forfeit') reason = won ? ' · victoria por abandono' : ' · partida por abandono';
+    if (message.reason === 'disconnect') reason = won ? ' · victoria por desconexión' : ' · partida interrumpida';
+    this.refs.onlineResultSummary.textContent = `Duelo contra ${opponent.nickname || 'Rival'}${reason}`;
+    this.refs.onlineResultYouName.textContent = this.user?.nickname || 'Tú';
+    this.refs.onlineResultOpponentName.textContent = opponent.nickname || 'Rival';
+    this.refs.onlineResultYouScore.textContent = youScore;
+    this.refs.onlineResultOpponentScore.textContent = opponentScore;
+
+    this.refs.onlineRatingChange.classList.remove('is-up', 'is-down');
+    if (!ranked) {
+      this.refs.onlineRatingChange.textContent = 'AMISTOSA · SIN CAMBIO DE PUNTOS';
+    } else if (delta > 0) {
+      this.refs.onlineRatingChange.textContent = `+${delta} PTS · TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
+      this.refs.onlineRatingChange.classList.add('is-up');
+    } else if (delta < 0) {
+      this.refs.onlineRatingChange.textContent = `${delta} PTS · TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
+      this.refs.onlineRatingChange.classList.add('is-down');
+    } else {
+      this.refs.onlineRatingChange.textContent = `SIN CAMBIO · ${updatedUser?.rating ?? rating.after ?? '—'} PTS`;
     }
+
+    const record = updatedUser ? `${updatedUser.wins ?? 0} victorias · ${updatedUser.losses ?? 0} derrotas` : '';
+    const rank = updatedUser?.rank ? ` · puesto #${updatedUser.rank}` : '';
+    this.refs.onlineResultRecord.textContent = ranked ? `${record}${rank}` : 'Las amistosas no alteran el ranking';
     this.loadLeaderboard();
   }
 

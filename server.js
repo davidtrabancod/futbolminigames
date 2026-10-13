@@ -4,14 +4,12 @@ const http = require('http');
 const path = require('path');
 const { exec } = require('child_process');
 const { WebSocketServer, WebSocket } = require('ws');
-const { ArenaDatabase, AVATARS, SESSION_DAYS } = require('./server/database');
-const { ZONES, REGULATION_SHOTS, resolvePenalty, getMatchProgress, chooseBotZone } = require('./server/penalty-rules');
+const { ArenaDatabase, AVATARS, SESSION_DAYS, RATING_POINTS } = require('./server/database');
+const { ZONES, REGULATION_SHOTS, resolvePenalty, getMatchProgress } = require('./server/penalty-rules');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 3000;
 const DB_PATH = process.env.ARENA_DB_PATH || path.join(ROOT, 'data', 'arena.sqlite');
-const RATING_POINTS = 24;
-const QUEUE_WAIT_MS = 10_000;
 const ACTION_TIMEOUT_MS = 45_000;
 const INVITE_TTL_MS = 30 * 60 * 1000;
 const MAX_BODY_BYTES = 16 * 1024;
@@ -187,18 +185,16 @@ function removeInviteFor(ws) {
 }
 
 function userForMatch(user) {
-  if (!user) return { id: null, nickname: 'Rival CPU', avatar: '🤖', rating: 1000, rank: null, wins: 0, matches: 0 };
   return { id: user.id, nickname: user.nickname, avatar: user.avatar, rating: user.rating, rank: user.rank, wins: user.wins, matches: user.matches };
 }
 
-function createMatch({ players, mode, botIndex = null }) {
+function createMatch({ players, mode }) {
   const id = crypto.randomUUID();
   const match = {
     id,
     mode,
     players,
-    connections: players.map((player, index) => index === botIndex ? null : clientsByUser.get(player.id)),
-    botIndex,
+    connections: players.map(player => clientsByUser.get(player.id)),
     scores: [0, 0],
     shots: [0, 0],
     nextShooter: 0,
@@ -227,7 +223,6 @@ function publishMatchStart(match) {
       playerIndex: index,
       you: players[index],
       opponent: players[1 - index],
-      opponentIsBot: match.botIndex === 1 - index,
       shots: match.shots,
       scores: match.scores,
       regulationShots: REGULATION_SHOTS,
@@ -264,23 +259,10 @@ function startTurn(match) {
 
   match.turnTimer = setTimeout(() => {
     if (match.ended) return;
-    const idleIndex = match.turnActions.shot === null
-      ? (match.botIndex === shooterIndex ? null : shooterIndex)
-      : (match.botIndex === keeperIndex ? null : keeperIndex);
-    if (idleIndex === null) {
-      resolveTurn(match);
-      return;
-    }
+    const idleIndex = match.turnActions.shot === null ? shooterIndex : keeperIndex;
     finishMatch(match, 1 - idleIndex, 'forfeit');
   }, ACTION_TIMEOUT_MS);
 
-  if (match.botIndex === shooterIndex) {
-    match.turnActions.shot = chooseBotZone();
-    sendMatchState(match);
-  } else if (match.botIndex === keeperIndex) {
-    match.turnActions.save = chooseBotZone();
-    sendMatchState(match);
-  }
   if (match.turnActions.shot !== null && match.turnActions.save !== null) resolveTurn(match);
 }
 
@@ -315,10 +297,6 @@ function handleMatchAction(ws, message) {
     return;
   }
   match.turnActions[role] = message.zone;
-  if (match.botIndex !== null) {
-    const botRole = match.botIndex === match.nextShooter ? 'shot' : 'save';
-    if (match.turnActions[botRole] === null) match.turnActions[botRole] = chooseBotZone();
-  }
   sendMatchState(match);
   if (match.turnActions.shot !== null && match.turnActions.save !== null) resolveTurn(match);
 }
@@ -368,7 +346,6 @@ function finishMatch(match, winnerIndex, reason) {
     players: match.players,
     scores: match.scores,
     winnerIndex,
-    botIndex: match.botIndex,
     suddenDeath: match.suddenDeath
   });
   match.connections.forEach((ws, index) => {
@@ -420,21 +397,8 @@ function handleSocketMessage(ws, rawData) {
     }
 
     ws.queueState = 'ranked';
-    sendSocket(ws, { type: 'queue-wait', timeoutSeconds: QUEUE_WAIT_MS / 1000 });
-    const entry = { ws, timer: null };
-    entry.timer = setTimeout(() => {
-      const index = queue.indexOf(entry);
-      if (index < 0 || ws.readyState !== WebSocket.OPEN) return;
-      queue.splice(index, 1);
-      ws.queueState = null;
-      sendSocket(ws, { type: 'queue-bot' });
-      createMatch({
-        players: [ws.arenaUser, { id: null, nickname: 'Rival CPU', avatar: '🤖', rating: 1000, wins: 0, matches: 0 }],
-        mode: 'ranked',
-        botIndex: 1
-      });
-    }, QUEUE_WAIT_MS);
-    queue.push(entry);
+    sendSocket(ws, { type: 'queue-wait' });
+    queue.push({ ws, timer: null });
     return;
   }
 

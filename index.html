@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#15803d">
   <link rel="canonical" href="https://tu-proyecto.vercel.app/">
 
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Soporte Multilingüe Hreflang -->
   <link rel="alternate" hreflang="es" href="https://tu-proyecto.vercel.app/">
@@ -178,7 +178,7 @@
             }
           },
           fontFamily: {
-            kids: ['Fredoka', 'system-ui', 'sans-serif']
+            kids: ['Chakra Petch', 'system-ui', 'sans-serif']
           }
         }
       }
@@ -211,10 +211,11 @@
 
       <!-- Controles de Audio y Pantalla Completa -->
       <div class="flex items-center gap-2 sm:gap-3">
-        <!-- Contador de Estrellas Ganadas -->
-        <div class="flex items-center gap-1 bg-emerald-950/70 border-2 border-yellow-400/50 px-2.5 py-1 rounded-full text-xs sm:text-sm font-bold text-yellow-300" title="Estrellas conseguidas">
-          <span>⭐</span>
-          <span id="headerStarsCount">0</span>
+        <!-- Puntuación competitiva online -->
+        <div class="header-rating" title="Puntos de ranking online" aria-label="Puntos de ranking online">
+          <span aria-hidden="true">🏆</span>
+          <span id="headerRatingCount">—</span>
+          <small>PTS</small>
         </div>
 
         <button id="profileButton" class="profile-button" type="button" aria-label="Iniciar sesión o crear perfil">
@@ -249,12 +250,77 @@
       <div class="menu-heading text-center my-4 sm:my-6">
         <span class="menu-heading__eyebrow">FUTBOLÍN KIDS ARENA PRESENTA</span>
         <h1 class="text-2xl sm:text-4xl font-extrabold text-yellow-300 drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)]">
-          ¡Elige tu Desafío Futbolero! 🏆
+          Duelo de penaltis 1 contra 1
         </h1>
         <p class="text-emerald-200 text-sm sm:text-base font-medium mt-1">
-          Elige tu reto y conviértete en una leyenda del fútbol
+          Compite online con jugadores de todo el mundo y sube en el ranking.
         </p>
       </div>
+
+      <section class="online-hub w-full max-w-5xl mb-6" aria-labelledby="onlineHubTitle">
+        <div class="online-hub__heading">
+          <span class="online-hub__eyebrow">COMPITE EN TODO EL MUNDO · 1 VS 1</span>
+          <h2 id="onlineHubTitle">¿Listo para el duelo?</h2>
+          <p>Busca un rival real o invita a un amigo. Cada partido cuenta para el ranking mundial.</p>
+        </div>
+
+        <div class="online-hub__layout">
+          <div class="online-hub__play">
+            <div class="online-hub__stadium" aria-hidden="true">
+              <span class="online-hub__stadium-label">ESTADIO MUNDIAL <b>·</b> 1 VS 1</span>
+              <span class="online-hub__stadium-ball">⚽</span>
+              <span class="online-hub__stadium-caption">TU PRÓXIMO DUELO EMPIEZA AQUÍ</span>
+            </div>
+            <div class="online-hub__duel-heading">
+              <span class="online-hub__eyebrow">JUEGA CONTRA PERSONAS REALES</span>
+              <h3>Entra al campo</h3>
+              <p>Encuentra a otro jugador o reta directamente a un amigo.</p>
+            </div>
+
+            <div class="online-hub__actions">
+              <button id="rankedMatchBtn" class="btn-arcade btn-arcade-green online-action" type="button">
+                🔎 Buscar rival
+              </button>
+              <button id="createFriendlyBtn" class="btn-arcade btn-arcade-blue online-action" type="button">
+                🤝 Invitar a un amigo
+              </button>
+            </div>
+
+            <div id="onlineStatus" class="online-status" role="status" aria-live="polite">
+              Inicia sesión para jugar y guardar tus puntos.
+            </div>
+            <button id="cancelOnlineBtn" class="online-text-button hidden" type="button">Cancelar búsqueda</button>
+
+            <div id="invitePanel" class="invite-panel hidden">
+              <div>
+                <span class="online-mini-label">CÓDIGO DE INVITACIÓN</span>
+                <strong id="inviteCode" class="invite-code">------</strong>
+              </div>
+              <button id="copyInviteBtn" class="online-secondary-button" type="button">Copiar código</button>
+            </div>
+
+            <form id="joinInviteForm" class="join-invite">
+              <label for="inviteCodeInput">¿Tienes un código? Únete a esa partida.</label>
+              <div class="join-invite__controls">
+                <input id="inviteCodeInput" name="inviteCode" maxlength="6" autocomplete="off" placeholder="ABC123" required>
+                <button id="joinInviteBtn" class="online-secondary-button" type="submit">Unirme</button>
+              </div>
+            </form>
+          </div>
+          <div class="leaderboard leaderboard--frontpage">
+            <div class="leaderboard__heading">
+              <div>
+                <span class="online-hub__eyebrow">RANKING MUNDIAL · TOP 10</span>
+                <h3>🏆 Los mejores jugadores</h3>
+              </div>
+              <button id="refreshLeaderboardBtn" class="online-secondary-button" type="button" aria-label="Actualizar clasificación">↻</button>
+            </div>
+            <ol id="leaderboardList" class="leaderboard__list" aria-live="polite">
+              <li class="leaderboard__empty">Cargando clasificación…</li>
+            </ol>
+          </div>
+        </div>
+      </section>
 
       <!-- Cuadrícula de Minijuegos para Niños -->
       <div class="game-grid grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full max-w-5xl">
@@ -295,7 +361,7 @@
               <div class="game-card__art animate-float">
                 <span class="game-card__symbol" aria-hidden="true">🗺️⚽</span>
               </div>
-              <span class="game-card__stage-badge">5 PAÍSES <span aria-hidden="true">✦</span> 1 LEYENDA</span>
+              <span class="game-card__stage-badge">5 PAÍSES <span aria-hidden="true">✦</span> 5 ESTADIOS</span>
             </div>
 
             <div class="game-card__content">
@@ -305,17 +371,17 @@
                 <span class="game-card__title-plaque game-card__title-plaque--gold">World Tour</span>
               </h2>
               <p class="game-card__description">
-                Recorre el mundo, conquista cada estadio y reta al legendario Benji Price.
+                Supera tandas en cinco países y desbloquea nuevos estadios.
               </p>
               <div class="game-card__stats">
                 <div class="game-card__record game-card__stat bg-emerald-950/80 rounded-2xl p-2.5 text-center border border-emerald-700/60 my-2" aria-label="Récord personal">
                   <span class="game-card__record-label game-card__stat-label">🏆 Récord personal</span>
                   <span class="game-card__stat-value"><span id="badge-high-penaltis">0</span> <span class="game-card__stat-unit">pts</span></span>
                 </div>
-                <div class="game-card__rank game-card__stat" aria-label="Puesto en el ranking global: disponible próximamente">
-                  <span class="game-card__stat-label">🌐 Ranking global</span>
+                <div class="game-card__rank game-card__stat" aria-label="Tu puesto en el ranking online">
+                  <span class="game-card__stat-label">🌐 Tu puesto online</span>
                   <span class="game-card__stat-value">—</span>
-                  <span class="game-card__rank-status">Online próximamente</span>
+                  <span class="game-card__rank-status">Inicia sesión para competir</span>
                 </div>
               </div>
               <button class="btn-arcade btn-arcade-green w-full py-3 text-base sm:text-lg mt-2 pointer-events-none">
@@ -458,65 +524,10 @@
         </button>
         <div class="text-5xl mb-2">🌍⚽</div>
         <h1 class="text-2xl sm:text-4xl font-extrabold text-yellow-300">Gira Mundial de Penaltis</h1>
-        <p class="text-emerald-200 text-sm sm:text-base mt-2">Supera cada tanda para desbloquear el siguiente destino.</p>
+        <p class="text-emerald-200 text-sm sm:text-base mt-2">Minijuego individual: supera cada tanda para desbloquear el siguiente destino. No cambia tu puesto online.</p>
         <p id="worldTourProgress" class="text-yellow-200 font-bold mt-3"></p>
       </div>
 
-      <section class="online-hub w-full max-w-3xl mb-6" aria-labelledby="onlineHubTitle">
-        <div class="online-hub__heading">
-          <span class="online-hub__eyebrow">COMPITE EN TIEMPO REAL</span>
-          <h2 id="onlineHubTitle">⚔️ Duelo de Penaltis 1 vs 1</h2>
-          <p>Tres penaltis por jugador y muerte súbita si seguís empatados. Cada victoria o derrota cambia tu puntuación global.</p>
-        </div>
-
-        <div class="online-hub__actions">
-          <button id="rankedMatchBtn" class="btn-arcade btn-arcade-green online-action" type="button">
-            🔎 JUGAR RANKED
-          </button>
-          <button id="createFriendlyBtn" class="btn-arcade btn-arcade-blue online-action" type="button">
-            🤝 CREAR PARTIDA AMISTOSA
-          </button>
-        </div>
-
-        <div id="onlineStatus" class="online-status" role="status" aria-live="polite">
-          Inicia sesión para buscar rivales y guardar tu clasificación.
-        </div>
-        <button id="cancelOnlineBtn" class="online-text-button hidden" type="button">Cancelar búsqueda</button>
-
-        <div id="invitePanel" class="invite-panel hidden">
-          <div>
-            <span class="online-mini-label">CÓDIGO PARA TU AMIGO</span>
-            <strong id="inviteCode" class="invite-code">------</strong>
-          </div>
-          <button id="copyInviteBtn" class="online-secondary-button" type="button">Copiar código</button>
-        </div>
-
-        <form id="joinInviteForm" class="join-invite">
-          <label for="inviteCodeInput">¿Tienes un código de invitación?</label>
-          <div class="join-invite__controls">
-            <input id="inviteCodeInput" name="inviteCode" maxlength="6" autocomplete="off" placeholder="ABC123" required>
-            <button id="joinInviteBtn" class="online-secondary-button" type="submit">Unirme</button>
-          </div>
-        </form>
-
-        <div class="leaderboard">
-          <div class="leaderboard__heading">
-            <div>
-              <span class="online-hub__eyebrow">LA CLASIFICACIÓN GLOBAL</span>
-              <h3>🏆 Mejores tiradores</h3>
-            </div>
-            <button id="refreshLeaderboardBtn" class="online-secondary-button" type="button" aria-label="Actualizar clasificación">↻</button>
-          </div>
-          <ol id="leaderboardList" class="leaderboard__list" aria-live="polite">
-            <li class="leaderboard__empty">Cargando clasificación…</li>
-          </ol>
-        </div>
-
-        <div class="online-hub__footer">
-          <span>🎮 Sin rival en 10 segundos: juegas contra la máquina y también cuenta para el ranking.</span>
-          <button id="backToWorldTourBtn" class="online-text-button" type="button">🗺️ Ver niveles del World Tour</button>
-        </div>
-      </section>
       <div id="worldTourLevels" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-3xl"></div>
     </section>
 
@@ -541,7 +552,7 @@
           <span id="suddenDeathBadge" class="sudden-death-badge hidden">⚡ MUERTE SÚBITA</span>
         </div>
         <article class="online-player online-player--opponent">
-          <span id="onlineOpponentAvatar" class="online-player__avatar">🤖</span>
+          <span id="onlineOpponentAvatar" class="online-player__avatar">⚽</span>
           <strong id="onlineOpponentName">Rival</strong>
           <span id="onlineOpponentMeta" class="online-player__meta">1000 pts</span>
           <span id="onlineOpponentScore" class="online-player__score">0</span>
@@ -572,10 +583,17 @@
       <button id="forfeitOnlineBtn" class="online-forfeit-button" type="button">Abandonar partida</button>
 
       <div id="onlineMatchResult" class="online-result hidden" role="status" aria-live="polite">
+        <span id="onlineResultMode" class="online-result__eyebrow">PARTIDA CLASIFICATORIA</span>
         <span id="onlineResultIcon" class="online-result__icon">🏆</span>
         <h2 id="onlineResultTitle">¡Victoria!</h2>
         <p id="onlineResultSummary"></p>
+        <div class="online-result__scoreboard" aria-label="Marcador final">
+          <div><span id="onlineResultYouName">Tú</span><strong id="onlineResultYouScore">0</strong></div>
+          <span class="online-result__versus">VS</span>
+          <div><span id="onlineResultOpponentName">Rival</span><strong id="onlineResultOpponentScore">0</strong></div>
+        </div>
         <div id="onlineRatingChange" class="online-rating-change"></div>
+        <p id="onlineResultRecord" class="online-result__record"></p>
         <div class="online-result__actions">
           <button id="onlinePlayAgainBtn" class="btn-arcade btn-arcade-green" type="button">🔄 Jugar otra vez</button>
           <button id="onlineReturnBtn" class="btn-arcade btn-arcade-blue" type="button">🏠 Volver al menú</button>

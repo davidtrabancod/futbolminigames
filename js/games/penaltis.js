@@ -1,11 +1,7 @@
 /**
- * Futbolín Kids Arena - Minijuego 1: "Penaltis Locos: World Tour" (Anime Gira Mundial)
+ * Futbolín Kids Arena - Minijuego individual: tanda de penaltis World Tour
  * Niveles progresivos en 5 países/ciudades icónicas:
- * 1. 🇯🇵 Tokio (Japón) - Benji Price (Gorra 'W', Estadio Nacional)
- * 2. 🇧🇷 Río de Janeiro (Brasil) - Salinas (Acrobacias de Samba, Maracaná)
- * 3. 🇩🇪 Múnich (Alemania) - Deuter Muller (El Gigante de Acero Rubio)
- * 4. 🇮🇹 Milán (Italia) - Gino Hernandez (La Mano Perfecta de Europa)
- * 5. 🇪🇸 Madrid (España) - El Campeón Supremo (Gran Final del Mundial)
+ * Completa tandas en cinco ciudades y desbloquea el siguiente estadio.
  */
 
 const WORLD_TOUR_LEVELS = [
@@ -17,8 +13,8 @@ const WORLD_TOUR_LEVELS = [
     flag: '🇯🇵',
     stadium: 'Estadio Nacional',
     landmark: '🗼',
-    keeperName: 'Benji Price',
-    keeperType: 'benji',
+    keeperName: 'Portero de Tokio',
+    keeperType: 'tokyo',
     jerseyColor: ['#166534', '#15803d'],
     shortsColor: '#0f172a',
     hasCap: true,
@@ -27,12 +23,12 @@ const WORLD_TOUR_LEVELS = [
     hairColor: '#0f172a',
     skinColor: '#fed7aa',
     skyColors: ['#0f172a', '#1e1b4b', '#312e81'],
-    ledText: '⚡ CAPTAIN TSUBASA ★ TOKIO ★ NEWTEAM VS SAN FRANCIS ⚡',
+    ledText: 'PENALTIS ★ TOKIO ★ JAPÓN',
     targetScore: 3,
     diveSpeed: 5.2,
     reactionDelay: 0.12,
     guessRate: 0.35,
-    description: 'El guardameta legendario con su mítica gorra roja y blanca.'
+    description: 'Empieza la gira en el Estadio Nacional de Tokio.'
   },
   {
     id: 'rio',
@@ -42,7 +38,7 @@ const WORLD_TOUR_LEVELS = [
     flag: '🇧🇷',
     stadium: 'Estadio Maracaná',
     landmark: '⛰️',
-    keeperName: 'Salinas',
+    keeperName: 'Portero de Río',
     keeperType: 'salinas',
     jerseyColor: ['#ca8a04', '#eab308'],
     shortsColor: '#1d4ed8',
@@ -51,12 +47,12 @@ const WORLD_TOUR_LEVELS = [
     hairColor: '#1c1917',
     skinColor: '#d97706',
     skyColors: ['#1e1b4b', '#7c2d12', '#ea580c'],
-    ledText: '🇧🇷 COPA SAMBA ★ RÍO DE JANEIRO ★ MAGIA Y RITMO BRASILEÑO 🇧🇷',
+    ledText: 'PENALTIS ★ RÍO DE JANEIRO ★ BRASIL',
     targetScore: 3,
     diveSpeed: 5.8,
     reactionDelay: 0.09,
     guessRate: 0.45,
-    description: 'Portero felino de reflejos acrobáticos y saltos de samba.'
+    description: 'Avanza hasta el Maracaná y demuestra tu puntería.'
   },
   {
     id: 'munich',
@@ -66,7 +62,7 @@ const WORLD_TOUR_LEVELS = [
     flag: '🇩🇪',
     stadium: 'Olympiastadion',
     landmark: '🏰',
-    keeperName: 'Deuter Muller',
+    keeperName: 'Portero de Múnich',
     keeperType: 'muller',
     jerseyColor: ['#1e293b', '#334155'],
     shortsColor: '#020617',
@@ -75,12 +71,12 @@ const WORLD_TOUR_LEVELS = [
     hairColor: '#facc15',
     skinColor: '#ffedd5',
     skyColors: ['#020617', '#0f172a', '#1e3a8a'],
-    ledText: '🇩🇪 DEUTSCHLAND CUP ★ MÚNICH ★ EL MURO DE ACERO ALEMÁN 🇩🇪',
+    ledText: 'PENALTIS ★ MÚNICH ★ ALEMANIA',
     targetScore: 4,
     diveSpeed: 6.3,
     reactionDelay: 0.07,
     guessRate: 0.55,
-    description: 'El gigante de acero alemán. Envergadura y fuerza colosales.'
+    description: 'Supera la tanda en el Olympiastadion de Múnich.'
   },
   {
     id: 'milan',
@@ -90,7 +86,7 @@ const WORLD_TOUR_LEVELS = [
     flag: '🇮🇹',
     stadium: 'San Siro',
     landmark: '🏛️',
-    keeperName: 'Gino Hernandez',
+    keeperName: 'Portero de Milán',
     keeperType: 'gino',
     jerseyColor: ['#0369a1', '#0284c7'],
     shortsColor: '#ffffff',
@@ -99,12 +95,12 @@ const WORLD_TOUR_LEVELS = [
     hairColor: '#451a03',
     skinColor: '#fed7aa',
     skyColors: ['#090d16', '#064e3b', '#047857'],
-    ledText: '🇮🇹 SERIE A SHOWDOWN ★ MILÁN ★ CATENACCIO IMPENETRABLE 🇮🇹',
+    ledText: 'PENALTIS ★ MILÁN ★ ITALIA',
     targetScore: 4,
     diveSpeed: 6.7,
     reactionDelay: 0.05,
     guessRate: 0.65,
-    description: 'La Mano Perfecta de Europa. Reflejos milimétricos al poste.'
+    description: 'Llega a San Siro y afina tus lanzamientos.'
   },
   {
     id: 'madrid',
@@ -114,7 +110,7 @@ const WORLD_TOUR_LEVELS = [
     flag: '🇪🇸',
     stadium: 'Gran Final Bernabéu',
     landmark: '🏟️',
-    keeperName: 'El Campeón Supremo',
+    keeperName: 'Portero de Madrid',
     keeperType: 'final',
     jerseyColor: ['#b91c1c', '#dc2626'],
     shortsColor: '#0f172a',
@@ -124,12 +120,12 @@ const WORLD_TOUR_LEVELS = [
     hairColor: '#020617',
     skinColor: '#fed7aa',
     skyColors: ['#1e1b4b', '#701a75', '#e11d48'],
-    ledText: '👑 GRAN FINAL DEL MUNDIAL ★ MADRID ★ ¡SOLO PARA LEYENDAS! 👑',
+    ledText: 'PENALTIS ★ MADRID ★ GRAN FINAL',
     targetScore: 4,
     diveSpeed: 7.2,
     reactionDelay: 0.04,
     guessRate: 0.75,
-    description: 'La batalla definitiva. ¡Vence al Campeón Mundial para coronarte!'
+    description: 'Completa la gira con la tanda final en Madrid.'
   }
 ];
 
@@ -821,12 +817,12 @@ class PenaltisGame {
       window.soundManager.playCatch();
       window.soundManager.playCrowdGroan();
 
-      this.triggerFeedbackText(`¡PARADÓN DE ${this.currentLevel.keeperName.toUpperCase()}! 🧤`, '¡Leyó tu lanzamiento a la perfección!', '#38bdf8');
+      this.triggerFeedbackText('¡PARADÓN! 🧤', 'El portero adivinó la dirección del tiro.', '#38bdf8');
     } else {
       this.score += 100 + this.streak * 25;
       this.streak++;
       this.history.push('goal');
-      this.triggerAnimeGoal('¡¡EL TIRO DEL TIGRE!! 🐯🔥', '¡Balón demoledor que perfora la red!', 100);
+      this.triggerAnimeGoal('¡GOOOL! ⚽🔥', '¡Buen lanzamiento, directo a la red!', 100);
     }
 
     if (this.app && this.app.updateHUD) {
@@ -1411,13 +1407,13 @@ class PenaltisGame {
 
     const span = k.diving ? 44 : 28;
     const gy = k.diving ? -48 : -14;
-    this.drawBenjiGlove(ctx, -span, gy, false);
-    this.drawBenjiGlove(ctx, span, gy, true);
+    this.drawKeeperGlove(ctx, -span, gy, false);
+    this.drawKeeperGlove(ctx, span, gy, true);
 
     ctx.restore();
   }
 
-  drawBenjiGlove(ctx, x, y, isRight) {
+  drawKeeperGlove(ctx, x, y, isRight) {
     ctx.save();
     ctx.translate(x, y);
     if (isRight) ctx.scale(-1, 1);

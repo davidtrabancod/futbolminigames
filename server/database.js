@@ -6,6 +6,7 @@ const { DatabaseSync } = require('node:sqlite');
 const AVATARS = ['⚽', '🥅', '🧤', '🐯', '🦊', '🐼', '🦁', '🐸', '🐵', '🐧', '🐲', '⭐'];
 const SESSION_DAYS = 30;
 const PASSWORD_BYTES = 64;
+const RATING_POINTS = 24;
 
 function inputError(message) {
   return Object.assign(new Error(message), { statusCode: 400 });
@@ -210,7 +211,7 @@ class ArenaDatabase {
         ratingResults = ratingResults.map((item, index) => {
           if (index === botIndex) return item;
           const won = index === winnerIndex;
-          const delta = won ? 24 : -24;
+          const delta = won ? RATING_POINTS : -RATING_POINTS;
           const after = Math.max(0, item.before + delta);
           this.db.prepare(`
             UPDATE users
@@ -260,4 +261,4 @@ class ArenaDatabase {
   }
 }
 
-module.exports = { ArenaDatabase, AVATARS, SESSION_DAYS };
+module.exports = { ArenaDatabase, AVATARS, SESSION_DAYS, RATING_POINTS };

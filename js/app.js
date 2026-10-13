@@ -290,8 +290,6 @@ class App {
     if (dEl) dEl.textContent = dScore;
     if (poEl) poEl.textContent = poScore;
 
-    const starsEl = document.getElementById('headerStarsCount');
-    if (starsEl) starsEl.textContent = window.storageManager.getStars();
   }
 
   showWorldTour() {
