@@ -594,7 +594,9 @@ class OnlineArena {
     this.refs.onlineOpponentMeta.textContent = `${opponent.rating ?? 1000} pts`;
 
     if (this.app.gameScreen) this.app.gameScreen.classList.remove('hidden');
-    if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.remove('hidden');
+    if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.add('hidden');
+    this.refs.forfeitOnlineBtn.classList.remove('hidden');
+    document.getElementById('pauseBtn')?.classList.add('hidden');
     this.refs.onlineMatchResult.classList.add('hidden');
     this.refs.cancelOnlineBtn.classList.add('hidden');
     if (this.app.menuScreen) this.app.menuScreen.classList.add('hidden');
@@ -767,6 +769,8 @@ class OnlineArena {
     this.app.gameScreen?.classList.add('hidden');
     this.refs.onlineMatchResult.classList.remove('hidden', 'is-win', 'is-loss', 'is-draw');
     this.refs.onlineMatchResult.classList.add(won ? 'is-win' : draw ? 'is-draw' : 'is-loss');
+    this.refs.onlineMatchScreen.classList.remove('hidden');
+    this.refs.forfeitOnlineBtn.classList.add('hidden');
 
     this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : 'PARTIDA AMISTOSA';
     this.refs.onlineResultIcon.textContent = won ? '🏆' : draw ? '🤝' : '⚡';

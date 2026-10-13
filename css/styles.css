@@ -1936,6 +1936,23 @@ body {
 .header-rating.is-updating { animation: ratingUpdated 850ms ease-out; }
 
 .online-match { position: relative; }
+.game-hud__forfeit {
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 0.7rem;
+  background: rgba(127, 29, 29, 0.62);
+  font-size: 1.2rem;
+  line-height: 1;
+  text-decoration: none;
+}
+.game-hud__forfeit.hidden { display: none; }
+.game-hud__forfeit:hover { color: #fff; background: rgba(185, 28, 28, 0.82); }
 .online-result.hidden { display: none; }
 
 .online-result:not(.hidden) {

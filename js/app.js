@@ -184,6 +184,10 @@ class App {
     // Volver al menú desde el juego
     this.backToMenuBtn.addEventListener('click', () => {
       window.soundManager.playClick();
+      if (window.onlineArena?.matchActive) {
+        window.onlineArena.refs.forfeitOnlineBtn.click();
+        return;
+      }
       this.goToMenu();
     });
 
@@ -373,6 +377,8 @@ class App {
     this.gameOverModal.classList.add('hidden');
     this.worldTourResultModal.classList.add('hidden');
     this.worldTourResultModal.classList.remove('flex');
+    this.pauseBtn.classList.remove('hidden');
+    document.getElementById('forfeitOnlineBtn')?.classList.add('hidden');
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -398,8 +404,10 @@ class App {
     // Ocultar pantallas de menú y mostrar el canvas de juego general
     this.menuScreen.classList.add('hidden');
     this.worldTourScreen.classList.add('hidden');
-    this.onlineMatchScreen.classList.remove('hidden'); // Mantiene el panel superior de marcadores pero muestra el juego
+    this.onlineMatchScreen.classList.add('hidden');
     this.gameScreen.classList.remove('hidden');
+    document.getElementById('pauseBtn')?.classList.add('hidden');
+    document.getElementById('forfeitOnlineBtn')?.classList.remove('hidden');
     this.pauseModal.classList.add('hidden');
     this.gameOverModal.classList.add('hidden');
 
@@ -518,7 +526,7 @@ class App {
         ${isGoal ? '⚽ ¡GOLAZO!' : '🧤 ¡PARADÓN!'}
       </div>
     `;
-    const targetArea = document.getElementById('onlineMatchScreen') || document.body;
+    const targetArea = document.getElementById('gameScreen') || document.body;
     targetArea.style.position = 'relative';
     targetArea.appendChild(notification);
 
@@ -541,6 +549,8 @@ class App {
     this.worldTourResultModal.classList.remove('flex');
     this.pauseModal.classList.add('hidden');
     this.gameOverModal.classList.add('hidden');
+    this.pauseBtn.classList.remove('hidden');
+    document.getElementById('forfeitOnlineBtn')?.classList.add('hidden');
 
     this.updateMenuScores();
   }
