@@ -659,5 +659,3 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 listen(PORT);
-
-module.exports = app;
