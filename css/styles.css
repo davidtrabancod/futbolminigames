@@ -2680,13 +2680,14 @@ body > footer {
 
 /* Selectable anime arcade goalkeeper roster */
 .keeper-select {
-  margin: 1.25rem 0;
+  margin: 0;
   padding: 1rem;
   border: 1px solid rgba(65, 240, 178, .22);
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(10, 43, 48, .9), rgba(3, 22, 33, .94));
   box-shadow: inset 0 1px rgba(255,255,255,.04), 0 12px 32px rgba(0,0,0,.18);
 }
+.leaderboard--frontpage { grid-column: 1 / -1; }
 .keeper-select__heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:.8rem; }
 .keeper-select__heading h4 { margin:.2rem 0 0; color:#fff0b3; font-size:1.25rem; font-weight:900; letter-spacing:.02em; }
 .keeper-select__status { color:#9ce9cf; font-size:.75rem; text-align:right; }
