@@ -19,192 +19,210 @@
     return roster.find(item => item.id === id) || roster[0];
   };
   const cardArt = typeof Image !== 'undefined' ? new Image() : null;
-  const matchArt = typeof Image !== 'undefined' ? new Image() : null;
   if (cardArt) {
     cardArt.src = './assets/goalkeeper-roster.png';
     cardArt.onload = () => document.querySelectorAll('.keeper-card__portrait').forEach(canvas =>
       paintPortrait(canvas, canvas.dataset.keeperId, canvas.parentElement.classList.contains('is-equipped')));
   }
-  if (matchArt) matchArt.src = './assets/goalkeeper-sprites.png';
 
-  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0) {
-    const p = byId(typeof keeper === 'string' ? keeper : keeper?.id);
-    if (matchArt?.complete && matchArt.naturalWidth) {
-      const cellWidth = matchArt.naturalWidth / 4;
-      const cellHeight = matchArt.naturalHeight / 2;
-      const col = p.artIndex % 4;
-      const row = Math.floor(p.artIndex / 4);
-      const profiles = [
-        { pace: 2.8, bob: 1.1, sway: .012, anticipation: .1, diveTilt: .9, diveStretch: 1.05, afterimages: 1 },
-        { pace: 7.5, bob: .7, sway: .018, anticipation: .16, diveTilt: 1.08, diveStretch: 1.22, afterimages: 3 },
-        { pace: 2.1, bob: 1.5, sway: .042, anticipation: .13, diveTilt: .86, diveStretch: 1.12, afterimages: 2 },
-        { pace: 1.45, bob: 2.1, sway: .018, anticipation: .08, diveTilt: .74, diveStretch: 1.04, afterimages: 1 },
-        { pace: 5.2, bob: 1.2, sway: .03, anticipation: .19, diveTilt: 1.02, diveStretch: 1.2, afterimages: 3 },
-        { pace: 3.8, bob: .5, sway: .008, anticipation: .1, diveTilt: .82, diveStretch: 1.1, afterimages: 1 },
-        { pace: 2.4, bob: 1.6, sway: .05, anticipation: .14, diveTilt: .95, diveStretch: 1.16, afterimages: 2 },
-        { pace: 1.8, bob: .65, sway: .01, anticipation: .11, diveTilt: .78, diveStretch: 1.06, afterimages: 1 }
-      ][p.artIndex];
-      const phase = time * profiles.pace + p.artIndex * 1.37;
-      const idle = !diving;
-      const anticipationLean = anticipating ? diveDirection * profiles.anticipation : 0;
-      const idleLean = idle ? Math.sin(phase * .5) * profiles.sway : 0;
-      const impact = ['saved', 'beaten'].includes(keeperState) && landingTimer < .58;
-      const breath = idle ? Math.sin(phase) : 0;
-      const leap = diving ? Math.sin(diveProgress * Math.PI) * 5 : 0;
-      const lean = diving
-        ? (diveRotation ? diveRotation * profiles.diveTilt / .88 : diveDirection * profiles.diveTilt * diveProgress) * Math.min(1, .35 + diveProgress * .9)
-        : impact ? diveRotation * Math.max(0, 1 - landingTimer / .58) + Math.sin(landingTimer * 27) * Math.exp(-landingTimer * 6) * .05
-          : anticipationLean + idleLean;
-      const horizontalStretch = diving ? 1 + .18 * profiles.diveStretch * Math.sin(diveProgress * Math.PI) : 1 + breath * .012;
-      const verticalStretch = diving ? 1 - .1 * diveProgress + .025 * Math.sin(diveProgress * Math.PI) : 1 - breath * .018;
-      const sideStep = idle ? Math.sin(phase) * (p.artIndex === 2 || p.artIndex === 6 ? 2.3 : .8) : 0;
-      const bodyW = 54;
-      const bodyH = 124;
-      const bodyY = -71;
-
-      const drawPose = (alpha, offsetX, offsetY, angle, sx, sy) => {
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.translate(x + offsetX, y - 8 + offsetY);
-        ctx.rotate(angle);
-        ctx.scale(scale * sx, scale * sy);
-        ctx.drawImage(matchArt, col * cellWidth, row * cellHeight, cellWidth, cellHeight, -bodyW / 2, bodyY, bodyW, bodyH);
-        ctx.restore();
-      };
-
-      // A moving ground shadow keeps the cutout planted in the goalmouth.
-      ctx.save();
-      ctx.translate(x + (diving ? diveDirection * 15 * diveProgress : sideStep), y + 37);
-      ctx.scale(scale * (diving ? 1.2 - diveProgress * .42 : 1 + breath * .04), scale * (diving ? .72 : 1));
-      ctx.fillStyle = 'rgba(1,10,18,.46)';
-      ctx.beginPath(); ctx.ellipse(0, 0, 28, 6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-
-      // Distinct idle tells and each keeper's colored pressure aura.
-      if (idle) {
-        ctx.save();
-        ctx.globalAlpha = .14 + (Math.sin(phase) + 1) * .08;
-        ctx.strokeStyle = p.colors[0]; ctx.lineWidth = p.artIndex === 5 ? 2.6 : 1.5;
-        const radius = p.artIndex === 7 ? 29 : 23 + Math.sin(phase) * 2;
-        ctx.beginPath(); ctx.ellipse(x, y - 25, radius, p.artIndex === 3 ? 38 : 28, Math.sin(phase) * .08, 0, Math.PI * 2); ctx.stroke();
-        if (p.artIndex === 3 || p.artIndex === 6) {
-          for (let i = 0; i < 3; i++) {
-            const a = phase + i * Math.PI * 2 / 3;
-            ctx.globalAlpha = .45;
-            ctx.fillStyle = p.colors[2];
-            ctx.beginPath(); ctx.arc(x + Math.cos(a) * 34, y - 35 + Math.sin(a) * 30, p.artIndex === 3 ? 1.7 : 2.2, 0, Math.PI * 2); ctx.fill();
-          }
-        }
-        if (p.artIndex === 5) {
-          ctx.globalAlpha = .75; ctx.fillStyle = '#b7ff5b';
-          ctx.beginPath(); ctx.arc(x - 24, y - 51, 2.3 + Math.sin(phase * 2) * .8, 0, Math.PI * 2); ctx.fill();
-          ctx.beginPath(); ctx.arc(x + 24, y - 51, 2.3 + Math.cos(phase * 2) * .8, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.restore();
-      }
-
-      if (anticipating) {
-        ctx.save(); ctx.globalAlpha = .28 + Math.sin(time * 28) * .1; ctx.strokeStyle = p.colors[2]; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(x - diveDirection * 17, y - 26); ctx.lineTo(x - diveDirection * 8, y - 24); ctx.lineTo(x, y - 27); ctx.stroke(); ctx.restore();
-      }
-
-      // Speed slashes and afterimages make the lateral save read as a full dive.
-      if (diving && diveProgress > .08) {
-        ctx.save();
-        ctx.globalAlpha = .13 * (1 - diveProgress * .45);
-        ctx.strokeStyle = p.colors[0]; ctx.lineWidth = 2.2;
-        for (let i = 0; i < 4; i++) {
-          const yy = y - 55 + i * 22;
-          ctx.beginPath(); ctx.moveTo(x - diveDirection * (27 + i * 5), yy - 5); ctx.lineTo(x - diveDirection * (43 + i * 7), yy + 2); ctx.stroke();
-        }
-        ctx.restore();
-        for (let i = profiles.afterimages; i > 0; i--) {
-          const lag = i / (profiles.afterimages + 1);
-          const alpha = (.08 + .035 * (profiles.afterimages - i)) * (1 - diveProgress * .45);
-          drawPose(alpha, -diveDirection * (34 * lag) * (1 - diveProgress), -leap * lag, lean * (1 - .12 * lag), horizontalStretch, verticalStretch);
-        }
-      }
-
-      const rebound = impact ? Math.sin(landingTimer * 27) * Math.exp(-landingTimer * 6) : 0;
-      const landedKick = impact ? rebound * .085 : 0;
-      const landingTilt = impact ? -diveDirection * rebound * .11 : 0;
-      drawPose(1, sideStep, -leap + (idle ? Math.sin(phase) * profiles.bob : 0) + rebound * 2, lean + landedKick + landingTilt, horizontalStretch, verticalStretch);
-      return;
-    }
-    const [bright, dark, trim, shorts] = p.colors;
+  function drawSegment(ctx, a, b, width, color, highlight) {
     ctx.save();
-    const rhythm = p.style === 'spikes' || p.style === 'bandana' ? 5 : p.style === 'helmet' ? 2 : 3.2;
-    ctx.translate(x, y + Math.sin(time * rhythm) * (diving ? 0 : (p.style === 'helmet' ? .6 : 1.4)));
-    ctx.rotate(diving ? Math.sin(time * 8) * 0.11 : Math.sin(time * rhythm * .5) * (p.style === 'ponytail' ? .035 : .012));
-    ctx.scale(scale, scale);
-    ctx.shadowColor = bright;
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = 'rgba(0,0,0,.35)';
-    ctx.beginPath(); ctx.ellipse(0, 41, 29, 7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Back accessories make each silhouette readable from the field.
-    if (p.style === 'ponytail') {
-      ctx.fillStyle = p.skin; ctx.beginPath(); ctx.ellipse(20, -42, 8, 23, -.5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = p.hair; ctx.beginPath(); ctx.moveTo(9,-51); ctx.quadraticCurveTo(30,-56,29,-36); ctx.quadraticCurveTo(25,-21,17,-27); ctx.closePath(); ctx.fill();
-    }
-    if (p.style === 'ears' || p.style === 'crown') {
-      ctx.fillStyle = p.style === 'ears' ? p.hair : trim;
-      ctx.beginPath(); ctx.moveTo(-12,-52); ctx.lineTo(-22,-73); ctx.lineTo(-2,-60); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(12,-52); ctx.lineTo(22,-73); ctx.lineTo(2,-60); ctx.closePath(); ctx.fill();
-    }
-    // Legs, socks and cleats
-    ctx.fillStyle = shorts; ctx.beginPath(); ctx.roundRect(-17,-2,34,20,5); ctx.fill();
-    ctx.fillStyle = bright; ctx.fillRect(-14,13,9,22); ctx.fillRect(5,13,9,22);
-    ctx.fillStyle = trim; ctx.fillRect(-14,25,9,3); ctx.fillRect(5,25,9,3);
-    ctx.fillStyle = '#111b2c'; ctx.beginPath(); ctx.roundRect(-18,34,15,7,3); ctx.roundRect(3,34,15,7,3); ctx.fill();
-
-    // Dynamic keeper tunic with piping and chest badge.
-    const grad = ctx.createLinearGradient(-20,-31,20,15); grad.addColorStop(0,bright); grad.addColorStop(1,dark);
-    ctx.fillStyle = grad; ctx.beginPath(); ctx.moveTo(-13,-32); ctx.lineTo(-22,-24); ctx.lineTo(-19,1); ctx.quadraticCurveTo(0,7,19,1); ctx.lineTo(22,-24); ctx.lineTo(13,-32); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = trim; ctx.lineWidth = 2.3; ctx.beginPath(); ctx.moveTo(-18,-19); ctx.lineTo(-15,-1); ctx.moveTo(18,-19); ctx.lineTo(15,-1); ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-8,-31); ctx.lineTo(0,-23); ctx.lineTo(8,-31); ctx.lineTo(4,-34); ctx.lineTo(-4,-34); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(p.sigil, 0, -7);
-    ctx.fillStyle = trim; ctx.beginPath(); ctx.arc(-11,-13,3.2,0,Math.PI*2); ctx.fill();
-
-    // Face and anime hair.
-    ctx.fillStyle = p.skin; ctx.beginPath(); ctx.ellipse(0,-44,13,15,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.beginPath(); ctx.ellipse(-5,-48,3,5,-.3,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = p.hair; ctx.beginPath();
-    ctx.moveTo(-14,-45); ctx.quadraticCurveTo(-19,-65,-4,-63); ctx.quadraticCurveTo(2,-70,9,-61); ctx.quadraticCurveTo(19,-57,14,-43);
-    if (p.style === 'spikes') { ctx.lineTo(18,-60); ctx.lineTo(7,-56); ctx.lineTo(2,-68); ctx.lineTo(-4,-57); ctx.lineTo(-15,-61); }
-    else { ctx.lineTo(9,-50); ctx.lineTo(3,-55); ctx.lineTo(-2,-50); ctx.lineTo(-8,-56); }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-5,-43,3.1,4,0,0,Math.PI*2); ctx.ellipse(5,-43,3.1,4,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = p.eyes || bright; ctx.beginPath(); ctx.ellipse(-5,-42.5,1.9,3,0,0,Math.PI*2); ctx.ellipse(5,-42.5,1.9,3,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#17243a'; ctx.beginPath(); ctx.arc(-5,-42,1.1,0,Math.PI*2); ctx.arc(5,-42,1.1,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-5.7,-44,1,0,Math.PI*2); ctx.arc(4.3,-44,1,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle = p.hair; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-8,-48); ctx.lineTo(-3,-49); ctx.moveTo(3,-49); ctx.lineTo(8,-48); ctx.stroke();
-    ctx.strokeStyle = '#a95556'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2,-36); ctx.quadraticCurveTo(0,-34,3,-36); ctx.stroke();
-    if (p.style === 'headband' || p.style === 'bandana') { ctx.fillStyle = trim; ctx.beginPath(); ctx.roundRect(-14,-53,28,4,2); ctx.fill(); ctx.fillRect(10,-51,9,3); }
-    if (p.style === 'visor' || p.style === 'helmet' || p.style === 'crown') {
-      ctx.fillStyle = p.style === 'visor' ? 'rgba(31,53,82,.9)' : trim;
-      ctx.beginPath(); ctx.roundRect(-15,-57,30,7,3); ctx.fill();
-      if (p.style === 'helmet') { ctx.fillStyle=bright; ctx.beginPath(); ctx.arc(0,-56,3,0,Math.PI*2); ctx.fill(); }
-      if (p.style === 'crown') { ctx.fillStyle=trim; ctx.beginPath(); ctx.moveTo(-10,-57); ctx.lineTo(-8,-67); ctx.lineTo(-2,-60); ctx.lineTo(2,-68); ctx.lineTo(7,-60); ctx.lineTo(10,-57); ctx.closePath(); ctx.fill(); }
-    }
-
-    const span = diving ? 43 : 28;
-    const gloveY = diving ? -44 : -16;
-    for (const side of [-1, 1]) {
-      ctx.save(); ctx.translate(side * span, gloveY); ctx.rotate(side * (diving ? -.45 : .12));
-      ctx.fillStyle = dark; ctx.beginPath(); ctx.roundRect(-11,-13,22,24,7); ctx.fill();
-      ctx.fillStyle = trim; ctx.beginPath(); ctx.roundRect(-12,-19,24,13,6); ctx.fill();
-      ctx.strokeStyle = bright; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-7,-15); ctx.lineTo(7,-15); ctx.stroke();
-      ctx.restore();
-    }
-    if (p.style === 'ears' || p.style === 'crown') {
-      ctx.strokeStyle = trim; ctx.lineWidth = 2; ctx.globalAlpha = .8;
-      ctx.beginPath(); ctx.arc(0,-8,29+Math.sin(time*4)*2,Math.PI*1.08,Math.PI*1.92); ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = '#101a2a'; ctx.lineWidth = width + 5; ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+    if (highlight) {
+      ctx.beginPath(); ctx.moveTo(a.x - width * .16, a.y - width * .12); ctx.lineTo(b.x - width * .16, b.y - width * .12);
+      ctx.strokeStyle = highlight; ctx.lineWidth = Math.max(1.5, width * .19); ctx.stroke();
     }
     ctx.restore();
   }
 
+  function drawGlove(ctx, x, y, angle, p, openness = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    const [bright, dark, trim] = p.colors;
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.roundRect(-10, -7, 21, 17, 6); ctx.fill();
+    ctx.fillStyle = trim; ctx.beginPath(); ctx.roundRect(-10, -8, 20, 15, 5); ctx.fill();
+    ctx.strokeStyle = bright; ctx.lineWidth = 1.7; ctx.beginPath(); ctx.moveTo(-7, 3); ctx.lineTo(7, 3); ctx.stroke();
+    for (let finger = 0; finger < 4; finger++) {
+      const offset = (finger - 1.5) * 4.3;
+      const spread = (finger - 1.5) * openness * 2.1;
+      ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 5.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(offset, -4); ctx.lineTo(offset + spread, -13 - (finger === 1 || finger === 2 ? 3 : 0)); ctx.stroke();
+      ctx.strokeStyle = trim; ctx.lineWidth = 3.6;
+      ctx.beginPath(); ctx.moveTo(offset, -4); ctx.lineTo(offset + spread, -13 - (finger === 1 || finger === 2 ? 3 : 0)); ctx.stroke();
+      ctx.fillStyle = bright; ctx.beginPath(); ctx.arc(offset + spread, -15 - (finger === 1 || finger === 2 ? 3 : 0), 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawRiggedGoalkeeper(ctx, p, x, y, scale, time, diving, diveRotation, diveProgress, anticipating, diveDirection, keeperState, landingTimer) {
+    const [bright, dark, trim, shorts] = p.colors;
+    const profile = [
+      { pace: 2.3, bob: 1.2, sway: .018, tilt: .92 }, { pace: 6.4, bob: .7, sway: .03, tilt: 1.16 },
+      { pace: 1.9, bob: 1.4, sway: .05, tilt: .94 }, { pace: 1.3, bob: 1.8, sway: .02, tilt: .8 },
+      { pace: 4.7, bob: 1.1, sway: .045, tilt: 1.12 }, { pace: 3.1, bob: .55, sway: .012, tilt: .88 },
+      { pace: 2.1, bob: 1.5, sway: .06, tilt: 1.02 }, { pace: 1.6, bob: .65, sway: .015, tilt: .84 }
+    ][p.artIndex];
+    const phase = time * profile.pace + p.artIndex * 1.19;
+    const landing = ['saved', 'beaten'].includes(keeperState) ? Math.max(0, 1 - landingTimer / .58) : 0;
+    const d = diving ? Math.min(1, diveProgress) : 0;
+    const prep = anticipating ? .18 : 0;
+    const side = diveDirection || 0;
+    const breath = Math.sin(phase);
+    const idleSway = Math.sin(phase * .52) * profile.sway;
+    const bob = diving ? Math.sin(d * Math.PI) * 2.8 : Math.sin(phase * 2) * profile.bob;
+    const anticipationLean = anticipating ? side * .13 : 0;
+    const diveLean = diving ? (diveRotation || side * profile.tilt * d) * profile.tilt : 0;
+    const landingLean = landing * diveRotation * .42 + Math.sin(landingTimer * 26) * Math.exp(-landingTimer * 6) * .035;
+    const torsoLean = diving ? diveLean : landing > 0 ? landingLean : idleSway + anticipationLean;
+    const impactShake = landing > 0 ? Math.sin(landingTimer * 31) * Math.exp(-landingTimer * 7) : 0;
+    const motion = diving ? d : prep;
+
+    ctx.save();
+    // Pressure shadow and team-colored goal-line glow keep the model grounded.
+    ctx.save(); ctx.translate(x + (diving ? -side * d * 9 : Math.sin(phase) * 1.5), y + 38);
+    ctx.scale(scale * (diving ? 1.08 - d * .35 : 1 + breath * .035), scale * .72);
+    ctx.fillStyle = 'rgba(1,9,18,.48)'; ctx.beginPath(); ctx.ellipse(0, 0, 27, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = .11 + (Math.sin(phase) + 1) * .035; ctx.strokeStyle = bright; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.ellipse(x, y + 28, 30 + Math.sin(phase) * 2, 9, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+
+    // Character-specific anticipation and flight streaks sit behind the body rig.
+    if (anticipating || diving) {
+      const weight = anticipating ? .22 + Math.sin(time * 25) * .06 : .32 * (1 - d * .5);
+      ctx.save(); ctx.globalAlpha = weight; ctx.strokeStyle = trim; ctx.lineWidth = p.artIndex === 5 ? 3 : 2;
+      const n = p.artIndex === 1 || p.artIndex === 4 ? 5 : 3;
+      for (let i = 0; i < n; i++) {
+        const yy = y - 46 + i * 15;
+        const back = (i + 1) * (diving ? 8 + d * 10 : 4);
+        ctx.beginPath(); ctx.moveTo(x - side * back, yy); ctx.lineTo(x - side * (back + 10), yy - 4); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    const rootX = x + (diving ? -side * d * 3 : Math.sin(phase) * (p.artIndex === 2 || p.artIndex === 6 ? 1.8 : .65)) + impactShake * 2;
+    const rootY = y - 8 - bob - (diving ? Math.sin(d * Math.PI) * 7 : 0) + impactShake;
+    const drawBone = (a, b, width, color, highlight) => drawSegment(ctx, a, b, width * scale, color, highlight);
+    const point = (ax, ay, bx, by) => ({ x: ax + (bx - ax) * motion, y: ay + (by - ay) * motion });
+
+    ctx.save(); ctx.translate(rootX, rootY); ctx.rotate(torsoLean * .52); ctx.scale(scale, scale);
+    const dir = side || (diveRotation < 0 ? -1 : 1);
+    const shirtGrad = ctx.createLinearGradient(-22, -42, 24, 12);
+    shirtGrad.addColorStop(0, bright); shirtGrad.addColorStop(1, dark);
+
+    // Back legs articulate at hip, knee and ankle; the dive trails the legs behind.
+    for (const leg of [-1, 1]) {
+      const hip = { x: leg * 10, y: -1 };
+      const idleKnee = { x: leg * 25, y: 23 };
+      const idleAnkle = { x: leg * 31, y: 48 };
+      const diveKnee = { x: -dir * 20 + leg * 7, y: 13 + Math.abs(leg) * 2 };
+      const diveAnkle = { x: -dir * (38 + (leg === -dir ? 8 : 0)) + leg * 4, y: 27 + (leg === dir ? 13 : 0) };
+      const knee = point(idleKnee.x, idleKnee.y, diveKnee.x, diveKnee.y);
+      const ankle = point(idleAnkle.x, idleAnkle.y, diveAnkle.x, diveAnkle.y);
+      drawBone(hip, knee, 13, shorts, trim);
+      ctx.fillStyle = trim; ctx.beginPath(); ctx.roundRect(knee.x - 5, knee.y - 5, 10, 10, 3); ctx.fill();
+      drawBone(knee, ankle, 10, bright, '#f5f7ff');
+      ctx.strokeStyle = 'rgba(255,255,255,.88)'; ctx.lineWidth = 1.7; ctx.beginPath(); ctx.moveTo(knee.x - 4, knee.y + 10); ctx.lineTo(ankle.x - 4, ankle.y - 5); ctx.stroke();
+      ctx.save(); ctx.translate(ankle.x, ankle.y + 3); ctx.rotate(leg * -.05 + (diving ? -dir * .22 : 0));
+      ctx.fillStyle = '#111a2b'; ctx.beginPath(); ctx.roundRect(-8, -3, 19, 9, 4); ctx.fill();
+      ctx.fillStyle = trim; ctx.fillRect(-2, -2, 3, 2); ctx.restore();
+    }
+
+    // Hip/shorts and fitted keeper jersey with piping, stripes and chest emblem.
+    ctx.fillStyle = shorts; ctx.beginPath(); ctx.moveTo(-15, -7); ctx.lineTo(15, -7); ctx.lineTo(18, 8); ctx.lineTo(10, 15); ctx.lineTo(2, 8); ctx.lineTo(-7, 15); ctx.lineTo(-18, 8); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = shirtGrad; ctx.beginPath(); ctx.moveTo(-14, -43); ctx.lineTo(-23, -36); ctx.lineTo(-20, -10); ctx.quadraticCurveTo(0, -3, 20, -10); ctx.lineTo(23, -36); ctx.lineTo(14, -43); ctx.lineTo(8, -47); ctx.lineTo(-8, -47); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = trim; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-18, -35); ctx.lineTo(-15, -14); ctx.moveTo(18, -35); ctx.lineTo(15, -14); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.88)'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-11, -41); ctx.lineTo(-8, -30); ctx.moveTo(11, -41); ctx.lineTo(8, -30); ctx.stroke();
+    ctx.fillStyle = trim; ctx.beginPath(); ctx.moveTo(-7, -46); ctx.lineTo(0, -38); ctx.lineTo(7, -46); ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.font = '900 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(p.sigil, 0, -16);
+    ctx.fillStyle = trim; ctx.beginPath(); ctx.arc(-10, -31, 2.6, 0, Math.PI * 2); ctx.fill();
+
+    // Arms are independent bones. The leading glove reaches into the selected corner.
+    const arms = [];
+    for (const arm of [-1, 1]) {
+      const shoulder = { x: arm * 18, y: -39 };
+      const idleElbow = { x: arm * 28, y: -18 };
+      const idleWrist = { x: arm * 37, y: -4 };
+      const lead = side === 0 ? 1 : arm === dir ? 1 : .66;
+      const diveElbow = side === 0 ? { x: arm * 24, y: -37 } : { x: dir * (lead === 1 ? 28 : 4), y: lead === 1 ? -32 : -16 };
+      const diveWrist = side === 0 ? { x: arm * 31, y: -43 } : { x: dir * (lead === 1 ? 46 : 27), y: lead === 1 ? -42 : -11 };
+      const elbow = point(idleElbow.x, idleElbow.y - prep * 8, diveElbow.x, diveElbow.y);
+      const wrist = point(idleWrist.x, idleWrist.y - prep * 13, diveWrist.x, diveWrist.y);
+      drawBone(shoulder, elbow, 11.5, bright, trim);
+      ctx.fillStyle = '#101a2a'; ctx.beginPath(); ctx.arc(elbow.x, elbow.y, 6.7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = bright; ctx.beginPath(); ctx.arc(elbow.x, elbow.y, 4.7, 0, Math.PI * 2); ctx.fill();
+      drawBone(elbow, wrist, 9.5, bright, '#fff1da');
+      arms.push({ arm, wrist, elbow, lead: lead === 1 });
+    }
+    for (const arm of arms) {
+      const gloveAngle = diving ? dir * -.25 : arm.arm * -.12 + Math.sin(phase + arm.arm) * .035;
+      drawGlove(ctx, arm.wrist.x, arm.wrist.y, gloveAngle, p, diving ? 1.25 : 1 + Math.sin(phase) * .08);
+    }
+    ctx.restore();
+
+    // Head stays counter-balanced against the torso, with character-specific hair/gear.
+    const headLean = -torsoLean * .28 + (diving ? -dir * .08 : 0);
+    ctx.save(); ctx.translate(rootX + (diving ? side * d * 2 : 0), rootY - 54 - bob * .25); ctx.rotate(headLean); ctx.scale(scale, scale);
+    if (p.style === 'ponytail') {
+      ctx.fillStyle = p.hair; ctx.beginPath(); ctx.moveTo(4, -8); ctx.quadraticCurveTo(31, -18 + Math.sin(phase) * 3, 27, 18); ctx.quadraticCurveTo(20, 29, 15, 8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    if (p.style === 'ears' || p.style === 'crown') {
+      ctx.fillStyle = p.style === 'ears' ? p.hair : trim;
+      ctx.beginPath(); ctx.moveTo(-10, -8); ctx.lineTo(-18, -31); ctx.lineTo(-1, -15); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(10, -8); ctx.lineTo(18, -31); ctx.lineTo(1, -15); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 2; ctx.stroke();
+      if (p.style === 'ears') { ctx.fillStyle = '#ff9bb2'; ctx.beginPath(); ctx.moveTo(-12, -13); ctx.lineTo(-16, -25); ctx.lineTo(-5, -14); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(12, -13); ctx.lineTo(16, -25); ctx.lineTo(5, -14); ctx.closePath(); ctx.fill(); }
+    }
+    ctx.fillStyle = p.skin; ctx.beginPath(); ctx.ellipse(0, 0, 13, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.beginPath(); ctx.ellipse(-5, -6, 3, 6, -.3, 0, Math.PI * 2); ctx.fill();
+    const blinkCycle = (time + p.artIndex * .83) % 4.8;
+    const blink = blinkCycle > 4.58 ? Math.max(.12, 1 - (blinkCycle - 4.58) / .18) : 1;
+    if (p.style === 'helmet') {
+      ctx.fillStyle = '#202b37'; ctx.beginPath(); ctx.roundRect(-14, -9, 28, 11, 4); ctx.fill();
+      ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#a7ff57'; ctx.shadowColor = '#a7ff57'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.roundRect(-10, -6, 20, 3, 2); ctx.fill(); ctx.shadowBlur = 0;
+    } else {
+      for (const eye of [-1, 1]) {
+        const ex = eye * 5.2;
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, -2, 3.4, 4.6 * blink, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.eyes || bright; ctx.beginPath(); ctx.ellipse(ex, -1.5, 2, 3.2 * blink, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#101a2a'; ctx.beginPath(); ctx.ellipse(ex, -1, .95, 2.1 * blink, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex - .7, -3, .9, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = p.hair; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-8, -8); ctx.lineTo(-3, -9); ctx.moveTo(3, -9); ctx.lineTo(8, -8); ctx.stroke();
+      ctx.strokeStyle = '#a95556'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2, 8); ctx.quadraticCurveTo(0, 10, 2, 8); ctx.stroke();
+    }
+    ctx.fillStyle = p.hair; ctx.beginPath(); ctx.moveTo(-14, -7); ctx.quadraticCurveTo(-18, -27, -5, -25); ctx.quadraticCurveTo(6, -31, 15, -17); ctx.lineTo(13, -8);
+    if (p.style === 'spikes') { ctx.lineTo(19, -27); ctx.lineTo(7, -21); ctx.lineTo(3, -32); ctx.lineTo(-3, -21); ctx.lineTo(-15, -28); }
+    else { ctx.lineTo(8, -13); ctx.lineTo(3, -18); ctx.lineTo(-1, -12); ctx.lineTo(-7, -18); }
+    ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 2; ctx.stroke();
+    if (p.style === 'headband' || p.style === 'bandana') { ctx.fillStyle = trim; ctx.beginPath(); ctx.roundRect(-13, -18, 26, 4, 2); ctx.fill(); ctx.fillRect(10, -17, 8, 2); }
+    if (p.style === 'visor') { ctx.fillStyle = 'rgba(116,224,255,.68)'; ctx.beginPath(); ctx.roundRect(-14, -17, 28, 5, 2); ctx.fill(); ctx.strokeStyle = '#eafcff'; ctx.lineWidth = 1; ctx.stroke(); }
+    if (p.style === 'crown') { ctx.fillStyle = trim; ctx.beginPath(); ctx.moveTo(-10, -19); ctx.lineTo(-8, -27); ctx.lineTo(-2, -21); ctx.lineTo(2, -29); ctx.lineTo(7, -21); ctx.lineTo(10, -19); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#101a2a'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    ctx.restore();
+
+    // Character signatures: swift cyan streaks, icy motes, servo lights, or a titan shock ring.
+    if (diving && p.artIndex === 7 && diveProgress > .72) {
+      ctx.save(); ctx.globalAlpha = (diveProgress - .72) * 1.8; ctx.strokeStyle = trim; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x, y + 34, 34 + diveProgress * 10, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    if (diving && (p.artIndex === 1 || p.artIndex === 4)) {
+      ctx.save(); ctx.globalAlpha = .55 * (1 - diveProgress); ctx.strokeStyle = p.artIndex === 1 ? '#49dcff' : '#ff4568'; ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x - side * (35 + i * 6), y - 34 + i * 17); ctx.lineTo(x - side * (57 + i * 7), y - 39 + i * 17); ctx.stroke(); }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0) {
+    const p = byId(keeper);
+    drawRiggedGoalkeeper(ctx, p, x, y, scale, time, diving, diveRotation, diveProgress, anticipating, diveDirection, keeperState, landingTimer);
+  }
   function paintPortrait(canvas, keeper, selected = false) {
     const ctx = canvas.getContext('2d');
     const ratio = window.devicePixelRatio || 1;

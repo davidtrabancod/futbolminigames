@@ -634,13 +634,14 @@ class PenaltisGame {
 
     const chosenZone = this.TARGET_ZONES.find(z => z.id === keeperChoiceId) || this.TARGET_ZONES[2];
     this.keeper.diveZoneId = keeperChoiceId;
-    this.keeper.targetX = keeperChoiceId === 'center' ? 200 : chosenZone.x;
+    this.keeper.diveDirection = Math.sign(chosenZone.x - this.keeper.baseX);
+    // Move the torso toward the shot while the leading glove reaches the actual corner.
+    this.keeper.targetX = chosenZone.x - this.keeper.diveDirection * 58;
     this.keeper.targetY = keeperChoiceId === 'center' ? 220 : chosenZone.y;
     this.keeper.diveStartX = this.keeper.x;
     this.keeper.diveStartY = this.keeper.y;
     this.keeper.diveProgress = 0;
     this.keeper.landingTimer = 0;
-    this.keeper.diveDirection = Math.sign(this.keeper.targetX - this.keeper.baseX);
     this.keeper.anticipating = false;
     this.keeper.recovering = false;
     this.keeper.rotation = 0;
