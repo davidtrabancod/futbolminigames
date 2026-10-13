@@ -197,6 +197,7 @@ class PenaltisGame {
       return;
     }
     this.pendingOnlineTurn = null;
+    const recoveringKeeper = ['saved', 'beaten'].includes(this.keeper.state) && this.keeper.landingTimer < 0.58;
     this.onlineRole = turnMessage.role === 'shooter' ? 'lanzador' : 'portero';
     this.state = 'aiming';
     this.activeZone = null;
@@ -204,11 +205,18 @@ class PenaltisGame {
     this.ball.inFlight = false;
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
-    this.keeper.x = this.keeper.baseX;
-    this.keeper.y = this.keeper.baseY;
-    this.keeper.rotation = 0;
-    this.keeper.state = 'idle';
+    if (!recoveringKeeper) {
+      this.keeper.x = this.keeper.baseX;
+      this.keeper.y = this.keeper.baseY;
+      this.keeper.rotation = 0;
+      this.keeper.state = 'idle';
+      this.keeper.landingTimer = 0;
+    }
+    this.keeper.recovering = recoveringKeeper;
     this.keeper.diving = false;
+    this.keeper.diveProgress = 0;
+    this.keeper.anticipating = false;
+    if (!recoveringKeeper) this.keeper.diveDirection = 0;
   }
 
   triggerOnlineShotAnimation(shooterZoneId, keeperZoneId, turnRole, isGoal) {
@@ -268,6 +276,13 @@ class PenaltisGame {
       state: 'idle',
       idleTimer: 0,
       diveZoneId: null,
+      diveProgress: 0,
+      landingTimer: 0,
+      recovering: false,
+      diveDirection: 0,
+      diveStartX: 200,
+      diveStartY: 230,
+      anticipating: false,
       diveSpeed: lvl.diveSpeed,
       reactionDelay: lvl.reactionDelay,
       guessRate: lvl.guessRate,
@@ -621,6 +636,14 @@ class PenaltisGame {
     this.keeper.diveZoneId = keeperChoiceId;
     this.keeper.targetX = keeperChoiceId === 'center' ? 200 : chosenZone.x;
     this.keeper.targetY = keeperChoiceId === 'center' ? 220 : chosenZone.y;
+    this.keeper.diveStartX = this.keeper.x;
+    this.keeper.diveStartY = this.keeper.y;
+    this.keeper.diveProgress = 0;
+    this.keeper.landingTimer = 0;
+    this.keeper.diveDirection = Math.sign(this.keeper.targetX - this.keeper.baseX);
+    this.keeper.anticipating = false;
+    this.keeper.recovering = false;
+    this.keeper.rotation = 0;
   }
 
   spawnMangaSpeedLines() {
@@ -643,9 +666,24 @@ class PenaltisGame {
     this.timer += dt;
 
     if (this.state === 'aiming') {
-      this.keeper.idleTimer += dt * 4;
-      this.keeper.x = this.keeper.baseX + Math.sin(this.keeper.idleTimer) * 12;
-      this.keeper.y = this.keeper.baseY + Math.abs(Math.cos(this.keeper.idleTimer)) * 3;
+      this.keeper.idleTimer += dt;
+      if (this.keeper.recovering) {
+        this.keeper.landingTimer += dt;
+        const recovery = Math.min(1, this.keeper.landingTimer / .58);
+        this.keeper.x += (this.keeper.baseX - this.keeper.x) * Math.min(1, dt * 5);
+        this.keeper.y += (this.keeper.baseY - this.keeper.y) * Math.min(1, dt * 5);
+        this.keeper.rotation *= Math.exp(-dt * 7);
+        if (recovery >= 1) {
+          this.keeper.recovering = false;
+          this.keeper.state = 'idle';
+          this.keeper.rotation = 0;
+          this.keeper.diveDirection = 0;
+        }
+      } else {
+        this.keeper.x = this.keeper.baseX + Math.sin(this.keeper.idleTimer * 1.4) * 3.5;
+        this.keeper.y = this.keeper.baseY + Math.abs(Math.cos(this.keeper.idleTimer * 2.1)) * 1.8;
+      }
+      this.keeper.anticipating = false;
 
       if (Math.random() < 0.35) {
         this.auraParticles.push({
@@ -700,19 +738,27 @@ class PenaltisGame {
         color: t > 0.5 ? '#f97316' : '#facc15'
       });
 
+      const anticipationStart = this.keeper.reactionDelay * 0.58;
+      this.keeper.anticipating = this.ball.progress >= anticipationStart && this.ball.progress <= this.keeper.reactionDelay;
       if (this.ball.progress > this.keeper.reactionDelay) {
         this.keeper.diving = true;
         this.keeper.state = 'diving';
-
-        this.keeper.x += (this.keeper.targetX - this.keeper.x) * this.keeper.diveSpeed * dt;
-        this.keeper.y += (this.keeper.targetY - this.keeper.y) * this.keeper.diveSpeed * dt;
-
-        const diveAngle = (this.keeper.targetX - 200) * 0.0065;
-        this.keeper.rotation = diveAngle;
+        const rawDive = Math.min(1, (this.ball.progress - this.keeper.reactionDelay) / Math.max(.12, 1 - this.keeper.reactionDelay));
+        const easedDive = 1 - Math.pow(1 - rawDive, 3);
+        this.keeper.diveProgress = easedDive;
+        this.keeper.x = this.keeper.diveStartX + (this.keeper.targetX - this.keeper.diveStartX) * easedDive;
+        const leap = Math.sin(rawDive * Math.PI) * (this.keeper.targetY <= this.keeper.diveStartY ? 13 : 5);
+        this.keeper.y = this.keeper.diveStartY + (this.keeper.targetY - this.keeper.diveStartY) * easedDive - leap;
+        this.keeper.rotation = this.keeper.diveDirection * .88 * easedDive;
+        this.keeper.anticipating = false;
       }
 
       if (t >= 1.0) {
         this.ball.inFlight = false;
+        this.keeper.diveProgress = 1;
+        this.keeper.diving = false;
+        this.keeper.anticipating = false;
+        this.keeper.landingTimer = 0;
         if (!this.isOnlineMode) {
           this.resolveAnimePenalty();
         } else {
@@ -720,6 +766,15 @@ class PenaltisGame {
           this.state = 'aiming';
           if (this.pendingOnlineTurn) this.setOnlineTurn(this.pendingOnlineTurn);
         }
+      }
+    }
+
+    if (this.isOnlineMode && !this.ball.inFlight && ['saved', 'beaten'].includes(this.keeper.state)) {
+      this.keeper.recovering = true;
+      if (this.state !== 'aiming') this.keeper.landingTimer += dt;
+      if (this.keeper.landingTimer > .58) {
+        this.keeper.recovering = false;
+        this.keeper.state = 'idle';
       }
     }
 
@@ -902,6 +957,11 @@ class PenaltisGame {
     this.keeper.rotation = 0;
     this.keeper.state = 'idle';
     this.keeper.diving = false;
+    this.keeper.diveProgress = 0;
+    this.keeper.landingTimer = 0;
+    this.keeper.recovering = false;
+    this.keeper.anticipating = false;
+    this.keeper.diveDirection = 0;
 
     this.ballFireTrail = [];
     this.state = 'aiming';
@@ -1341,8 +1401,11 @@ class PenaltisGame {
     const k = this.keeper;
     const lvl = this.currentLevel;
 
-    if (this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
-      window.GOALKEEPER_ROSTER.draw(ctx, this.onlineGoalkeeperId, k.x, k.y, 0.82, performance.now() / 1000, k.diving);
+    if (this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
+      window.GOALKEEPER_ROSTER.draw(
+        ctx, this.onlineGoalkeeperId, k.x, k.y, 1, this.timer || 0,
+        k.diving, k.rotation, k.diveProgress, k.anticipating, k.diveDirection, k.state, k.landingTimer
+      );
       return;
     }
 

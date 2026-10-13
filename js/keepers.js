@@ -27,20 +27,108 @@
   }
   if (matchArt) matchArt.src = './assets/goalkeeper-sprites.png';
 
-  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false) {
+  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0) {
     const p = byId(typeof keeper === 'string' ? keeper : keeper?.id);
     if (matchArt?.complete && matchArt.naturalWidth) {
       const cellWidth = matchArt.naturalWidth / 4;
       const cellHeight = matchArt.naturalHeight / 2;
       const col = p.artIndex % 4;
       const row = Math.floor(p.artIndex / 4);
+      const profiles = [
+        { pace: 2.8, bob: 1.1, sway: .012, anticipation: .1, diveTilt: .9, diveStretch: 1.05, afterimages: 1 },
+        { pace: 7.5, bob: .7, sway: .018, anticipation: .16, diveTilt: 1.08, diveStretch: 1.22, afterimages: 3 },
+        { pace: 2.1, bob: 1.5, sway: .042, anticipation: .13, diveTilt: .86, diveStretch: 1.12, afterimages: 2 },
+        { pace: 1.45, bob: 2.1, sway: .018, anticipation: .08, diveTilt: .74, diveStretch: 1.04, afterimages: 1 },
+        { pace: 5.2, bob: 1.2, sway: .03, anticipation: .19, diveTilt: 1.02, diveStretch: 1.2, afterimages: 3 },
+        { pace: 3.8, bob: .5, sway: .008, anticipation: .1, diveTilt: .82, diveStretch: 1.1, afterimages: 1 },
+        { pace: 2.4, bob: 1.6, sway: .05, anticipation: .14, diveTilt: .95, diveStretch: 1.16, afterimages: 2 },
+        { pace: 1.8, bob: .65, sway: .01, anticipation: .11, diveTilt: .78, diveStretch: 1.06, afterimages: 1 }
+      ][p.artIndex];
+      const phase = time * profiles.pace + p.artIndex * 1.37;
+      const idle = !diving;
+      const anticipationLean = anticipating ? diveDirection * profiles.anticipation : 0;
+      const idleLean = idle ? Math.sin(phase * .5) * profiles.sway : 0;
+      const impact = ['saved', 'beaten'].includes(keeperState) && landingTimer < .58;
+      const breath = idle ? Math.sin(phase) : 0;
+      const leap = diving ? Math.sin(diveProgress * Math.PI) * 5 : 0;
+      const lean = diving
+        ? (diveRotation ? diveRotation * profiles.diveTilt / .88 : diveDirection * profiles.diveTilt * diveProgress) * Math.min(1, .35 + diveProgress * .9)
+        : impact ? diveRotation * Math.max(0, 1 - landingTimer / .58) + Math.sin(landingTimer * 27) * Math.exp(-landingTimer * 6) * .05
+          : anticipationLean + idleLean;
+      const horizontalStretch = diving ? 1 + .18 * profiles.diveStretch * Math.sin(diveProgress * Math.PI) : 1 + breath * .012;
+      const verticalStretch = diving ? 1 - .1 * diveProgress + .025 * Math.sin(diveProgress * Math.PI) : 1 - breath * .018;
+      const sideStep = idle ? Math.sin(phase) * (p.artIndex === 2 || p.artIndex === 6 ? 2.3 : .8) : 0;
+      const bodyW = 54;
+      const bodyH = 124;
+      const bodyY = -71;
+
+      const drawPose = (alpha, offsetX, offsetY, angle, sx, sy) => {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x + offsetX, y - 8 + offsetY);
+        ctx.rotate(angle);
+        ctx.scale(scale * sx, scale * sy);
+        ctx.drawImage(matchArt, col * cellWidth, row * cellHeight, cellWidth, cellHeight, -bodyW / 2, bodyY, bodyW, bodyH);
+        ctx.restore();
+      };
+
+      // A moving ground shadow keeps the cutout planted in the goalmouth.
       ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(diving ? Math.sin(time * 8) * .14 : Math.sin(time * 2) * .012);
-      ctx.translate(0, Math.sin(time * (p.artIndex % 2 ? 4.2 : 2.8)) * (diving ? 0 : 1.2));
-      ctx.scale(scale, scale);
-      ctx.drawImage(matchArt, col * cellWidth, row * cellHeight, cellWidth, cellHeight, -32, -170, 64, 170);
+      ctx.translate(x + (diving ? diveDirection * 15 * diveProgress : sideStep), y + 37);
+      ctx.scale(scale * (diving ? 1.2 - diveProgress * .42 : 1 + breath * .04), scale * (diving ? .72 : 1));
+      ctx.fillStyle = 'rgba(1,10,18,.46)';
+      ctx.beginPath(); ctx.ellipse(0, 0, 28, 6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+
+      // Distinct idle tells and each keeper's colored pressure aura.
+      if (idle) {
+        ctx.save();
+        ctx.globalAlpha = .14 + (Math.sin(phase) + 1) * .08;
+        ctx.strokeStyle = p.colors[0]; ctx.lineWidth = p.artIndex === 5 ? 2.6 : 1.5;
+        const radius = p.artIndex === 7 ? 29 : 23 + Math.sin(phase) * 2;
+        ctx.beginPath(); ctx.ellipse(x, y - 25, radius, p.artIndex === 3 ? 38 : 28, Math.sin(phase) * .08, 0, Math.PI * 2); ctx.stroke();
+        if (p.artIndex === 3 || p.artIndex === 6) {
+          for (let i = 0; i < 3; i++) {
+            const a = phase + i * Math.PI * 2 / 3;
+            ctx.globalAlpha = .45;
+            ctx.fillStyle = p.colors[2];
+            ctx.beginPath(); ctx.arc(x + Math.cos(a) * 34, y - 35 + Math.sin(a) * 30, p.artIndex === 3 ? 1.7 : 2.2, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        if (p.artIndex === 5) {
+          ctx.globalAlpha = .75; ctx.fillStyle = '#b7ff5b';
+          ctx.beginPath(); ctx.arc(x - 24, y - 51, 2.3 + Math.sin(phase * 2) * .8, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + 24, y - 51, 2.3 + Math.cos(phase * 2) * .8, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      if (anticipating) {
+        ctx.save(); ctx.globalAlpha = .28 + Math.sin(time * 28) * .1; ctx.strokeStyle = p.colors[2]; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x - diveDirection * 17, y - 26); ctx.lineTo(x - diveDirection * 8, y - 24); ctx.lineTo(x, y - 27); ctx.stroke(); ctx.restore();
+      }
+
+      // Speed slashes and afterimages make the lateral save read as a full dive.
+      if (diving && diveProgress > .08) {
+        ctx.save();
+        ctx.globalAlpha = .13 * (1 - diveProgress * .45);
+        ctx.strokeStyle = p.colors[0]; ctx.lineWidth = 2.2;
+        for (let i = 0; i < 4; i++) {
+          const yy = y - 55 + i * 22;
+          ctx.beginPath(); ctx.moveTo(x - diveDirection * (27 + i * 5), yy - 5); ctx.lineTo(x - diveDirection * (43 + i * 7), yy + 2); ctx.stroke();
+        }
+        ctx.restore();
+        for (let i = profiles.afterimages; i > 0; i--) {
+          const lag = i / (profiles.afterimages + 1);
+          const alpha = (.08 + .035 * (profiles.afterimages - i)) * (1 - diveProgress * .45);
+          drawPose(alpha, -diveDirection * (34 * lag) * (1 - diveProgress), -leap * lag, lean * (1 - .12 * lag), horizontalStretch, verticalStretch);
+        }
+      }
+
+      const rebound = impact ? Math.sin(landingTimer * 27) * Math.exp(-landingTimer * 6) : 0;
+      const landedKick = impact ? rebound * .085 : 0;
+      const landingTilt = impact ? -diveDirection * rebound * .11 : 0;
+      drawPose(1, sideStep, -leap + (idle ? Math.sin(phase) * profiles.bob : 0) + rebound * 2, lean + landedKick + landingTilt, horizontalStretch, verticalStretch);
       return;
     }
     const [bright, dark, trim, shorts] = p.colors;
