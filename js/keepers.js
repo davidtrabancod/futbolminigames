@@ -13,7 +13,10 @@
     { id: 'kitsune', name: 'Yuki Kitsune', title: 'Zorro de la noche', unlockRating: 2200, colors: ['#c17aff', '#5425a0', '#ffcf65', '#202448'], skin: '#f4c9a8', hair: '#312347', style: 'ears', sigil: '狐' },
     { id: 'titan', name: 'Titán Solar', title: 'La última muralla', unlockRating: 2400, colors: ['#ffe45e', '#c67713', '#fff2b3', '#493326'], skin: '#8e533c', hair: '#28232b', style: 'crown', sigil: '★' }
   ];
-  const byId = id => roster.find(item => item.id === id) || roster[0];
+  const byId = value => {
+    const id = typeof value === 'string' ? value : value?.id;
+    return roster.find(item => item.id === id) || roster[0];
+  };
 
   function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false) {
     const p = byId(typeof keeper === 'string' ? keeper : keeper?.id);
@@ -100,12 +103,22 @@
     const p = byId(keeper);
     const [bright,dark,trim] = p.colors;
     const bg = ctx.createLinearGradient(0,0,width,height);
-    bg.addColorStop(0, dark); bg.addColorStop(.58, '#101a34'); bg.addColorStop(1, '#050b18');
+    bg.addColorStop(0, '#71d8ff'); bg.addColorStop(.34, '#d8f6ff'); bg.addColorStop(.48, dark); bg.addColorStop(1, '#050b18');
     ctx.fillStyle=bg; ctx.fillRect(0,0,width,height);
-    const glow=ctx.createRadialGradient(width*.52,height*.36,2,width*.52,height*.36,width*.72);
-    glow.addColorStop(0,bright+'bb'); glow.addColorStop(1,bright+'00'); ctx.fillStyle=glow; ctx.fillRect(0,0,width,height);
-    ctx.save(); ctx.globalAlpha=.35; ctx.strokeStyle=trim; ctx.lineWidth=1.2;
-    for(let i=-height;i<width+height;i+=16){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+height*.72,height);ctx.stroke();}
+    // Anime stadium: floodlights, packed stands, sweeping roof and pitch.
+    ctx.fillStyle='rgba(255,255,255,.8)';
+    for(let i=0;i<7;i++){const lx=width*(.08+i*.14);ctx.beginPath();ctx.moveTo(lx,0);ctx.lineTo(lx+width*.08,height*.38);ctx.lineTo(lx-width*.02,height*.38);ctx.closePath();ctx.fill();}
+    ctx.fillStyle='#10243d';ctx.beginPath();ctx.moveTo(0,height*.34);ctx.quadraticCurveTo(width*.5,height*.23,width,height*.34);ctx.lineTo(width,height*.52);ctx.lineTo(0,height*.52);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#ed5b83';ctx.fillRect(0,height*.37,width,height*.08);
+    for(let i=0;i<70;i++){ctx.fillStyle=i%3?'#fff0d2':'#7be5ff';ctx.globalAlpha=.4+(i%4)*.1;ctx.fillRect((i*37)%width,height*(.38+(i%5)*.012),2,2);}
+    ctx.globalAlpha=1;
+    ctx.fillStyle='#20b763';ctx.fillRect(0,height*.52,width,height*.48);
+    ctx.fillStyle='rgba(255,255,255,.11)';for(let i=0;i<6;i++)ctx.fillRect(i*width/3,height*.52,width/6,height*.48);
+    ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(width/2,height*.91,width*.46,height*.25,0,Math.PI,Math.PI*2);ctx.stroke();
+    const glow=ctx.createRadialGradient(width*.52,height*.42,2,width*.52,height*.42,width*.72);
+    glow.addColorStop(0,bright+'bb'); glow.addColorStop(1,bright+'00'); ctx.fillStyle=glow; ctx.fillRect(0,height*.25,width,height*.75);
+    ctx.save(); ctx.globalAlpha=.3; ctx.strokeStyle=trim; ctx.lineWidth=1.2;
+    for(let i=-height;i<width+height;i+=18){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+height*.72,height);ctx.stroke();}
     ctx.restore();
     ctx.save(); ctx.translate(width/2,height*.51); ctx.scale(width/108,height/160);
     ctx.shadowColor=bright; ctx.shadowBlur=selected?22:11;
