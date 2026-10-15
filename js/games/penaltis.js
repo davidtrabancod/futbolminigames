@@ -68,10 +68,10 @@ class PenaltisGame {
 
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
-    this.arenaBackground.src = './assets/penalty-stadium-gameplay.png';
+    this.arenaBackground.src = './assets/penalty-stadium-landscape.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
-      x: 8 + Math.random() * 384,
-      y: 150 + Math.random() * 148,
+      x: 20 + Math.random() * 920,
+      y: 105 + Math.random() * 180,
       radius: .45 + Math.random() * 1.1,
       phase: Math.random() * Math.PI * 2,
       speed: 1.2 + Math.random() * 3.5,
@@ -161,9 +161,9 @@ class PenaltisGame {
     this.state = 'aiming';
 
     this.goal = {
-      x: 60,
+      x: 40,
       y: 110,
-      w: 280,
+      w: 320,
       h: 170,
       postWidth: 12
     };
@@ -440,6 +440,7 @@ class PenaltisGame {
   
   handlePointerDown(x, y) {
     if (this.state !== 'aiming') return;
+    x = this.toSceneX(x);
 
     for (const z of this.TARGET_ZONES) {
       if (Math.hypot(x - z.x, y - z.y) <= 38) {
@@ -459,6 +460,7 @@ class PenaltisGame {
 
   handlePointerMove(x, y) {
     if (this.state !== 'aiming') return;
+    x = this.toSceneX(x);
 
     if (!this.isOnlineMode && this.dragStart) {
       this.dragCurrent = { x, y };
@@ -485,6 +487,7 @@ class PenaltisGame {
   }
 
   handlePointerUp(x, y) {
+    x = this.toSceneX(x);
     if (!this.isOnlineMode && this.state === 'aiming' && this.dragStart) {
       const dragDist = Math.hypot(x - this.dragStart.x, y - this.dragStart.y);
       if (dragDist > 18 && this.activeZone) {
@@ -494,6 +497,12 @@ class PenaltisGame {
       this.dragCurrent = null;
       this.activeZone = null;
     }
+  }
+
+  toSceneX(x) {
+    const scale = 1.5;
+    const offset = (this.app.virtualWidth - this.vWidth * scale) / 2;
+    return (x - offset) / scale;
   }
 
   selectZoneAction(zone) {
@@ -577,13 +586,14 @@ class PenaltisGame {
 
     if (Math.random() < dt * 24 && this.fireEmbers.length < 90) {
       const side = Math.random() < .5 ? 1 : -1;
+      const sourceX = side > 0 ? 930 : 30;
       this.fireEmbers.push({
-        x: side > 0 ? 5 + Math.random() * 34 : 361 + Math.random() * 34,
-        y: 278 + Math.random() * 110,
-        vx: -side * (5 + Math.random() * 24) + (Math.random() - .5) * 12,
-        vy: -(28 + Math.random() * 66),
-        size: .7 + Math.random() * 2.5,
-        life: .6 + Math.random() * 1.15,
+        x: sourceX + (Math.random() - .5) * 30,
+        y: 330 + Math.random() * 24,
+        vx: -side * (8 + Math.random() * 28) + (Math.random() - .5) * 12,
+        vy: -(38 + Math.random() * 85),
+        size: 1 + Math.random() * 3.5,
+        life: .7 + Math.random() * 1.25,
         age: 0,
         hue: Math.random() < .5 ? 24 : 42
       });
@@ -952,20 +962,21 @@ class PenaltisGame {
 
   render(ctx) {
     ctx.save();
-
+    this.renderCountryStadium(ctx);
+    const sceneScaleX = 1.5;
+    const sceneOffsetX = (this.app.virtualWidth - this.vWidth * sceneScaleX) / 2;
+    ctx.translate(sceneOffsetX, 0);
+    ctx.scale(sceneScaleX, 1);
     if (this.camera.shake > 0) {
-      const sx = (Math.random() - 0.5) * this.camera.shake;
-      const sy = (Math.random() - 0.5) * this.camera.shake;
-      ctx.translate(sx, sy);
+      ctx.translate((Math.random() - 0.5) * this.camera.shake, (Math.random() - 0.5) * this.camera.shake);
     }
-
     if (this.camera.zoom !== 1.0) {
       ctx.translate(200, 300);
       ctx.scale(this.camera.zoom, this.camera.zoom);
       ctx.translate(-200, -300);
     }
 
-    this.renderCountryStadium(ctx);
+    this.renderPenaltyPitchDetails(ctx);
     this.renderAnimeNet(ctx);
     this.renderAnimePosts(ctx);
 
@@ -973,9 +984,20 @@ class PenaltisGame {
       this.renderAnimeTargetDials(ctx);
     }
 
+    // Keep the keeper and ball round while the goal and pitch gain the wider perspective.
+    ctx.save();
+    ctx.translate(this.keeper.x, 0);
+    ctx.scale(1 / sceneScaleX, 1);
+    ctx.translate(-this.keeper.x, 0);
     this.renderCountryGoalkeeper(ctx);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(this.ball.x, 0);
+    ctx.scale(1 / sceneScaleX, 1);
+    ctx.translate(-this.ball.x, 0);
     this.renderBallFireTrail(ctx);
     this.renderAnimeBall(ctx);
+    ctx.restore();
     this.renderMangaSpeedlines(ctx);
 
     if (!this.isOnlineMode && this.state === 'aiming' && this.dragStart && this.dragCurrent && this.activeZone) {
@@ -987,8 +1009,12 @@ class PenaltisGame {
     ctx.restore();
 
     if (this.isOnlineMode) {
+      ctx.save();
+      ctx.translate(sceneOffsetX, 0);
+      ctx.scale(sceneScaleX, 1);
       this.renderOnlineRoleBanner(ctx);
       this.renderOnlineScoreboardOverlay(ctx);
+      ctx.restore();
     }
   }
 
@@ -1013,41 +1039,45 @@ class PenaltisGame {
   renderCountryStadium(ctx) {
     const image = this.arenaBackground;
     if (!image?.complete || !image.naturalWidth) {
-      this.renderClassicStadium(ctx);
-      return;
+      const fallback = ctx.createLinearGradient(0, 0, 0, this.app.virtualHeight);
+      fallback.addColorStop(0, '#071426'); fallback.addColorStop(.55, '#071c20'); fallback.addColorStop(1, '#087a35');
+      ctx.fillStyle = fallback;
+      ctx.fillRect(0, 0, this.app.virtualWidth, this.app.virtualHeight);
+    } else {
+      ctx.drawImage(image, 0, 0, this.app.virtualWidth, this.app.virtualHeight);
     }
 
-    ctx.drawImage(image, 0, 0, this.vWidth, this.vHeight);
-
-    // Moving stadium beams make the rendered stands feel alive without obscuring play.
+    const width = this.app.virtualWidth;
+    const height = this.app.virtualHeight;
+    // Stadium lights sweep through the crowd and graze the pitch like moving fixtures.
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    const sweep = Math.sin(this.timer * .42) * 28;
-    const boost = this.ball?.inFlight ? .16 : .095;
-    for (const side of [-1, 1]) {
-      const sourceX = side < 0 ? 8 : this.vWidth - 8;
-      const endX = this.vWidth / 2 + sweep * side;
-      const gradient = ctx.createLinearGradient(sourceX, 58, endX, 310);
-      gradient.addColorStop(0, `rgba(204,244,255,${boost})`);
-      gradient.addColorStop(.55, 'rgba(124,230,255,.045)');
+    const sweep = Math.sin(this.timer * .28) * width * .2;
+    for (const [i, sourceX] of [width * .12, width * .88].entries()) {
+      const endX = width * (.5 + (i ? -1 : 1) * .24) + sweep;
+      const gradient = ctx.createLinearGradient(sourceX, 20, endX, height * .68);
+      gradient.addColorStop(0, `rgba(211,244,255,${this.ball?.inFlight ? .12 : .075})`);
+      gradient.addColorStop(.55, 'rgba(124,230,255,.035)');
       gradient.addColorStop(1, 'rgba(255,180,77,0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.moveTo(sourceX, 58);
-      ctx.lineTo(endX - 64, 310);
-      ctx.lineTo(endX + 64, 310);
+      ctx.moveTo(sourceX - 9, 22);
+      ctx.lineTo(endX - 115, height * .68);
+      ctx.lineTo(endX + 115, height * .68);
+      ctx.lineTo(sourceX + 9, 22);
       ctx.closePath();
       ctx.fill();
     }
     ctx.restore();
 
+    // The pyrotechnics are anchored to the stadium towers in the background plate.
     this.renderFireEffects(ctx);
 
-    // Individual glints drift in brightness and position like a moving crowd.
+    // Thousands of tiny crowd reflections pulse as an arena-wide wave.
     ctx.save();
     for (const light of this.crowdLights) {
       const pulse = .14 + (Math.sin(this.timer * light.speed + light.phase) + 1) * .2;
-      const sway = Math.sin(this.timer * .7 + light.phase) * .48;
+      const sway = Math.sin(this.timer * .7 + light.phase) * .8;
       ctx.globalAlpha = pulse;
       ctx.fillStyle = light.color;
       ctx.beginPath();
@@ -1056,7 +1086,7 @@ class PenaltisGame {
     }
     ctx.restore();
 
-    // Fire embers rise from both stadium braziers.
+    // Fire particles rise from the fixed braziers, carrying their light into smoke and grass.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const ember of this.fireEmbers) {
@@ -1071,7 +1101,13 @@ class PenaltisGame {
     }
     ctx.restore();
 
-    // Penalty spot and arc sit in perspective over the detailed turf plate.
+    const vignette = ctx.createRadialGradient(width / 2, height * .43, width * .2, width / 2, height * .43, width * .75);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(1,7,14,.48)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  renderPenaltyPitchDetails(ctx) {
     ctx.save();
     const grassGlow = ctx.createRadialGradient(200, 475, 2, 200, 475, 155);
     grassGlow.addColorStop(0, 'rgba(185,255,188,.11)');
@@ -1091,37 +1127,42 @@ class PenaltisGame {
     ctx.fill();
     ctx.restore();
 
-    const vignette = ctx.createRadialGradient(200, 300, 175, 200, 300, 430);
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(1,7,14,.42)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, this.vWidth, this.vHeight);
   }
 
   renderFireEffects(ctx) {
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 5; i++) {
-        const phase = this.timer * (8 + i * .7) + i * 1.9 + (side < 0 ? 0 : 1.2);
-        const x = side < 0 ? 13 + i * 4.5 : this.vWidth - 13 - i * 4.5;
-        const baseY = 344 + (i % 2) * 7;
-        const height = 13 + (Math.sin(phase) + 1) * 10 + (i % 3) * 3;
-        const width = 2.3 + (Math.cos(phase * .8) + 1) * 1.6;
-        const lean = Math.sin(phase * .55) * 5 - side * 3;
-        const flame = ctx.createLinearGradient(x, baseY, x + lean, baseY - height);
-        flame.addColorStop(0, 'rgba(255,65,18,.08)');
-        flame.addColorStop(.38, 'rgba(255,112,24,.72)');
-        flame.addColorStop(.78, 'rgba(255,208,82,.88)');
-        flame.addColorStop(1, 'rgba(255,248,193,.12)');
+    ctx.globalCompositeOperation = 'screen';
+    const height = this.app.virtualHeight;
+    for (const sourceX of [30, this.app.virtualWidth - 30]) {
+      const phase = this.timer * 5.8 + sourceX;
+      const baseY = height * .49;
+      const flicker = .88 + Math.sin(phase) * .12;
+      const glow = ctx.createRadialGradient(sourceX, baseY - 14, 4, sourceX, baseY - 5, 98);
+      glow.addColorStop(0, `rgba(255,171,54,${.32 * flicker})`);
+      glow.addColorStop(.34, `rgba(255,82,22,${.16 * flicker})`);
+      glow.addColorStop(1, 'rgba(255,55,15,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(sourceX - 100, baseY - 105, 200, 170);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let tongue = 0; tongue < 6; tongue++) {
+        const phaseTongue = phase + tongue * 1.7;
+        const x = sourceX + Math.sin(phaseTongue * .73) * (8 + tongue * 1.2);
+        const flameHeight = (26 + (Math.sin(phaseTongue) + 1) * 13) * flicker;
+        const tongueWidth = 5 + (Math.cos(phaseTongue * .8) + 1) * 3;
+        const lean = Math.sin(phaseTongue * .45) * 8;
+        const flame = ctx.createLinearGradient(x, baseY, x + lean, baseY - flameHeight);
+        flame.addColorStop(0, 'rgba(255,69,10,.08)');
+        flame.addColorStop(.4, 'rgba(255,102,18,.8)');
+        flame.addColorStop(.78, 'rgba(255,201,66,.94)');
+        flame.addColorStop(1, 'rgba(255,249,202,.05)');
         ctx.fillStyle = flame;
-        ctx.shadowColor = '#ff701e'; ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.moveTo(x - width, baseY);
-        ctx.quadraticCurveTo(x - width * 1.2, baseY - height * .45, x + lean, baseY - height);
-        ctx.quadraticCurveTo(x + width * 1.4, baseY - height * .46, x + width, baseY);
+        ctx.moveTo(x - tongueWidth, baseY);
+        ctx.quadraticCurveTo(x - tongueWidth * 1.2, baseY - flameHeight * .48, x + lean, baseY - flameHeight);
+        ctx.quadraticCurveTo(x + tongueWidth * 1.4, baseY - flameHeight * .4, x + tongueWidth, baseY);
         ctx.closePath(); ctx.fill();
       }
+      ctx.globalCompositeOperation = 'screen';
     }
     ctx.restore();
   }
@@ -1502,6 +1543,7 @@ class PenaltisGame {
 
       ctx.save();
       ctx.translate(z.x, z.y);
+      ctx.scale(1 / 1.5, 1);
 
       const pulse = isSelected ? Math.sin(this.timer * 10) * 5 : 0;
       const r = (isSelected ? 32 : 26) + pulse;

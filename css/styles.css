@@ -3273,16 +3273,19 @@ body > footer {
 .arena-game-frame {
   isolation:isolate;
   display:flex;
-  width:min(100%,400px);
-  aspect-ratio:2 / 3;
+  width:min(calc(100vw - 3rem),1200px);
+  aspect-ratio:16 / 10;
   flex:none;
   border:1px solid rgba(255,205,110,.82)!important;
   border-radius:.78rem!important;
   background:#020812!important;
-  background-image:linear-gradient(180deg,rgba(2,8,18,.08),rgba(2,8,18,.22)),url('../assets/penalty-stadium-gameplay.png')!important;
+  background-image:linear-gradient(180deg,rgba(2,8,18,.08),rgba(2,8,18,.22)),url('../assets/penalty-stadium-landscape.png')!important;
   background-position:center;
   background-size:cover;
   box-shadow:0 0 0 2px rgba(10,239,186,.18),0 0 0 5px rgba(0,0,0,.56),0 0 30px rgba(255,104,39,.22),0 20px 52px rgba(0,0,0,.52)!important;
+}
+@media (max-width:640px) {
+  .arena-game-frame { width:calc(100vw - 1.25rem); aspect-ratio:4 / 3; }
 }
 .arena-game-frame::after {
   position:absolute; z-index:3; inset:0; content:""; pointer-events:none;

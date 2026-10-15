@@ -7,8 +7,8 @@ class App {
     this.canvas = document.getElementById('gameCanvas');
     this.ctx = this.canvas.getContext('2d');
 
-    // Resolución lógica virtual estándar (400 x 600)
-    this.virtualWidth = 400;
+    // Resolución lógica panorámica del campo (960 x 600)
+    this.virtualWidth = 960;
     this.virtualHeight = 600;
 
     this.activeGameId = null;
@@ -395,10 +395,10 @@ class App {
       this.ctx.textAlign = 'center';
       this.ctx.fillStyle = '#ffe36e';
       this.ctx.font = '900 18px Barlow Condensed, sans-serif';
-      this.ctx.fillText('NO SE PUDO CARGAR LA PARTIDA', 200, 285);
+      this.ctx.fillText('NO SE PUDO CARGAR LA PARTIDA', this.virtualWidth / 2, 285);
       this.ctx.fillStyle = '#b8d8d4';
       this.ctx.font = '600 13px Chakra Petch, sans-serif';
-      this.ctx.fillText('Pulsa MENÚ y vuelve a entrar en la partida.', 200, 315);
+      this.ctx.fillText('Pulsa MENÚ y vuelve a entrar en la partida.', this.virtualWidth / 2, 315);
       this.ctx.restore();
     } finally {
       requestAnimationFrame((t) => this.gameLoop(t));
