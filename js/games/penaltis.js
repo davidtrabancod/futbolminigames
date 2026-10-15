@@ -51,6 +51,7 @@ class PenaltisGame {
     this.onOnlineActionSubmit = null;
 
     this.initNetMesh();
+    this.initArenaAtmosphere();
 
     this.auraParticles = [];
     this.speedLines = [];
@@ -63,6 +64,20 @@ class PenaltisGame {
     };
 
     this.reset();
+  }
+
+  initArenaAtmosphere() {
+    this.arenaBackground = new Image();
+    this.arenaBackground.src = './assets/penalty-stadium-gameplay.png';
+    this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
+      x: 8 + Math.random() * 384,
+      y: 150 + Math.random() * 148,
+      radius: .45 + Math.random() * 1.1,
+      phase: Math.random() * Math.PI * 2,
+      speed: 1.2 + Math.random() * 3.5,
+      color: ['#ffe28a', '#6be7ff', '#ff805c', '#ffffff'][index % 4]
+    }));
+    this.fireEmbers = [];
   }
 
   // --- MÉTODOS ONLINE ---
@@ -91,6 +106,8 @@ class PenaltisGame {
     this.activeZone = null;
     this.hoverZone = null;
     this.ball.inFlight = false;
+    this.ball.inNet = false;
+    this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
     if (!recoveringKeeper) {
@@ -189,6 +206,10 @@ class PenaltisGame {
       progress: 0,
       flightTime: 0.54,
       rotation: 0,
+      velocityX: 0,
+      velocityY: 0,
+      inNet: false,
+      netAge: 0,
       inFlight: false,
       selectedZone: null,
       result: null
@@ -493,6 +514,7 @@ class PenaltisGame {
     this.feedbackSubtext = '';
     this.state = 'shooting';
     this.ball.inFlight = true;
+    this.ball.inNet = false;
     this.ball.progress = 0;
     this.ball.targetX = zone.x;
     this.ball.targetY = zone.y;
@@ -552,6 +574,28 @@ class PenaltisGame {
 
   update(dt) {
     this.timer += dt;
+
+    if (Math.random() < dt * 24 && this.fireEmbers.length < 90) {
+      const side = Math.random() < .5 ? 1 : -1;
+      this.fireEmbers.push({
+        x: side > 0 ? 5 + Math.random() * 34 : 361 + Math.random() * 34,
+        y: 278 + Math.random() * 110,
+        vx: -side * (5 + Math.random() * 24) + (Math.random() - .5) * 12,
+        vy: -(28 + Math.random() * 66),
+        size: .7 + Math.random() * 2.5,
+        life: .6 + Math.random() * 1.15,
+        age: 0,
+        hue: Math.random() < .5 ? 24 : 42
+      });
+    }
+    for (let i = this.fireEmbers.length - 1; i >= 0; i--) {
+      const ember = this.fireEmbers[i];
+      ember.age += dt;
+      ember.x += ember.vx * dt;
+      ember.y += ember.vy * dt;
+      ember.vy -= 9 * dt;
+      if (ember.age >= ember.life) this.fireEmbers.splice(i, 1);
+    }
 
     if (this.state === 'aiming') {
       this.keeper.idleTimer += dt;
@@ -657,6 +701,32 @@ class PenaltisGame {
       }
     }
 
+    if (this.ball.inNet) {
+      const ball = this.ball;
+      ball.netAge += dt;
+      ball.velocityY += 390 * dt;
+      ball.x += ball.velocityX * dt;
+      ball.y += ball.velocityY * dt;
+      ball.velocityX *= Math.exp(-2.2 * dt);
+      ball.velocityY *= Math.exp(-.45 * dt);
+      ball.rotation += dt * 5;
+      const left = this.goal.x + 17, right = this.goal.x + this.goal.w - 17;
+      const bottom = this.goal.y + this.goal.h - 18;
+      if (ball.x < left || ball.x > right) {
+        ball.x = Math.max(left, Math.min(right, ball.x));
+        ball.velocityX *= -.42;
+      }
+      if (ball.y > bottom) {
+        ball.y = bottom;
+        ball.velocityY *= -.34;
+        if (Math.abs(ball.velocityY) < 20) ball.velocityY = 0;
+      }
+      if (ball.netAge > 1.25) {
+        ball.inNet = false;
+        ball.velocityX = ball.velocityY = 0;
+      }
+    }
+
     if (this.isOnlineMode && !this.ball.inFlight && ['saved', 'beaten'].includes(this.keeper.state)) {
       this.keeper.recovering = true;
       if (this.state !== 'aiming') this.keeper.landingTimer += dt;
@@ -675,10 +745,11 @@ class PenaltisGame {
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
-        const springForce = (0 - node.z) * 14;
+        const springForce = (0 - node.z) * 18;
         node.vz += springForce * dt;
-        node.vz *= 0.86;
+        node.vz *= Math.exp(-3.8 * dt);
         node.z += node.vz * dt;
+        if (Math.abs(node.z) < .025 && Math.abs(node.vz) < .08) node.z = node.vz = 0;
       }
     }
 
@@ -718,6 +789,10 @@ class PenaltisGame {
     this.camera.targetZoom = 1.0;
 
     if (isGoal) {
+      this.ball.inNet = true;
+      this.ball.netAge = 0;
+      this.ball.velocityX = (this.ball.startX - this.ball.targetX) * .34;
+      this.ball.velocityY = 86;
       this.ball.result = 'goal';
       this.keeper.state = 'beaten';
       this.bulgeNet(this.ball.targetX, this.ball.targetY, 50);
@@ -763,6 +838,7 @@ class PenaltisGame {
     const keeperZone = this.keeper.diveZoneId;
 
     if (playerZone === keeperZone) {
+      this.ball.inNet = false;
       this.ball.result = 'saved';
       this.keeper.state = 'saved';
       this.streak = 0;
@@ -803,6 +879,10 @@ class PenaltisGame {
   }
 
   triggerAnimeGoal(title, subtitle, pts) {
+    this.ball.inNet = true;
+    this.ball.netAge = 0;
+    this.ball.velocityX = (this.ball.startX - this.ball.targetX) * .34;
+    this.ball.velocityY = 86;
     this.ball.result = 'goal';
     this.keeper.state = 'beaten';
 
@@ -838,6 +918,8 @@ class PenaltisGame {
     this.ball.progress = 0;
     this.ball.result = null;
     this.ball.inFlight = false;
+    this.ball.inNet = false;
+    this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.selectedZone = null;
 
     this.keeper.x = this.keeper.baseX;
@@ -929,6 +1011,122 @@ class PenaltisGame {
   }
 
   renderCountryStadium(ctx) {
+    const image = this.arenaBackground;
+    if (!image?.complete || !image.naturalWidth) {
+      this.renderClassicStadium(ctx);
+      return;
+    }
+
+    ctx.drawImage(image, 0, 0, this.vWidth, this.vHeight);
+
+    // Moving stadium beams make the rendered stands feel alive without obscuring play.
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const sweep = Math.sin(this.timer * .42) * 28;
+    const boost = this.ball?.inFlight ? .16 : .095;
+    for (const side of [-1, 1]) {
+      const sourceX = side < 0 ? 8 : this.vWidth - 8;
+      const endX = this.vWidth / 2 + sweep * side;
+      const gradient = ctx.createLinearGradient(sourceX, 58, endX, 310);
+      gradient.addColorStop(0, `rgba(204,244,255,${boost})`);
+      gradient.addColorStop(.55, 'rgba(124,230,255,.045)');
+      gradient.addColorStop(1, 'rgba(255,180,77,0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(sourceX, 58);
+      ctx.lineTo(endX - 64, 310);
+      ctx.lineTo(endX + 64, 310);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    this.renderFireEffects(ctx);
+
+    // Individual glints drift in brightness and position like a moving crowd.
+    ctx.save();
+    for (const light of this.crowdLights) {
+      const pulse = .14 + (Math.sin(this.timer * light.speed + light.phase) + 1) * .2;
+      const sway = Math.sin(this.timer * .7 + light.phase) * .48;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = light.color;
+      ctx.beginPath();
+      ctx.arc(light.x + sway, light.y, light.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Fire embers rise from both stadium braziers.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const ember of this.fireEmbers) {
+      const fade = Math.max(0, 1 - ember.age / ember.life);
+      ctx.globalAlpha = fade * .82;
+      ctx.fillStyle = `hsl(${ember.hue} 100% ${55 + fade * 18}%)`;
+      ctx.shadowColor = ember.hue < 30 ? '#ff5b20' : '#ffd34e';
+      ctx.shadowBlur = ember.size * 4;
+      ctx.beginPath();
+      ctx.ellipse(ember.x, ember.y, ember.size * .58, ember.size * 1.25, ember.vx * .015, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Penalty spot and arc sit in perspective over the detailed turf plate.
+    ctx.save();
+    const grassGlow = ctx.createRadialGradient(200, 475, 2, 200, 475, 155);
+    grassGlow.addColorStop(0, 'rgba(185,255,188,.11)');
+    grassGlow.addColorStop(1, 'rgba(5,22,15,0)');
+    ctx.fillStyle = grassGlow;
+    ctx.fillRect(15, 320, 370, 280);
+    ctx.strokeStyle = 'rgba(231,255,235,.48)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(200, this.ball.startY + 15, 58, 21, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.shadowColor = '#d9ffe6';
+    ctx.shadowBlur = 7;
+    ctx.beginPath();
+    ctx.arc(this.ball.startX, this.ball.startY + 15, 2.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const vignette = ctx.createRadialGradient(200, 300, 175, 200, 300, 430);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(1,7,14,.42)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, this.vWidth, this.vHeight);
+  }
+
+  renderFireEffects(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 5; i++) {
+        const phase = this.timer * (8 + i * .7) + i * 1.9 + (side < 0 ? 0 : 1.2);
+        const x = side < 0 ? 13 + i * 4.5 : this.vWidth - 13 - i * 4.5;
+        const baseY = 344 + (i % 2) * 7;
+        const height = 13 + (Math.sin(phase) + 1) * 10 + (i % 3) * 3;
+        const width = 2.3 + (Math.cos(phase * .8) + 1) * 1.6;
+        const lean = Math.sin(phase * .55) * 5 - side * 3;
+        const flame = ctx.createLinearGradient(x, baseY, x + lean, baseY - height);
+        flame.addColorStop(0, 'rgba(255,65,18,.08)');
+        flame.addColorStop(.38, 'rgba(255,112,24,.72)');
+        flame.addColorStop(.78, 'rgba(255,208,82,.88)');
+        flame.addColorStop(1, 'rgba(255,248,193,.12)');
+        ctx.fillStyle = flame;
+        ctx.shadowColor = '#ff701e'; ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(x - width, baseY);
+        ctx.quadraticCurveTo(x - width * 1.2, baseY - height * .45, x + lean, baseY - height);
+        ctx.quadraticCurveTo(x + width * 1.4, baseY - height * .46, x + width, baseY);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  renderClassicStadium(ctx) {
     const lvl = this.currentLevel;
 
     const skyGrad = ctx.createLinearGradient(0, 0, 0, 145);
@@ -1175,56 +1373,125 @@ class PenaltisGame {
   }
 
   renderAnimeNet(ctx) {
+    const g = this.goal;
+    const leftAt = depth => g.x + 22 - depth * 15;
+    const rightAt = depth => g.x + g.w - 22 + depth * 15;
+    const topY = g.y + 22;
+    const bottomY = g.y + g.h - 13;
+    const pointAt = (row, col) => {
+      const v = row / this.netRows;
+      const u = col / this.netCols;
+      const node = this.netNodes[row][col];
+      const x = leftAt(v) + (rightAt(v) - leftAt(v)) * u + (u - .5) * node.z * .28;
+      const y = topY + (bottomY - topY) * v + node.z * .5;
+      return { x, y };
+    };
+
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
-    ctx.lineWidth = 1.3;
+    // Deep shaded net cavity and side curtains establish the goal's volume.
+    const cavity = ctx.createLinearGradient(0, topY, 0, bottomY);
+    cavity.addColorStop(0, 'rgba(2,10,20,.66)');
+    cavity.addColorStop(.55, 'rgba(3,19,25,.32)');
+    cavity.addColorStop(1, 'rgba(3,13,19,.58)');
+    ctx.fillStyle = cavity;
+    ctx.beginPath();
+    ctx.moveTo(leftAt(0), topY); ctx.lineTo(rightAt(0), topY);
+    ctx.lineTo(rightAt(1), bottomY); ctx.lineTo(leftAt(1), bottomY);
+    ctx.closePath(); ctx.fill();
 
-    for (let c = 0; c <= this.netCols; c++) {
+    ctx.fillStyle = 'rgba(4,16,24,.38)';
+    ctx.beginPath();
+    ctx.moveTo(g.x + 8, g.y + 9); ctx.lineTo(leftAt(0), topY);
+    ctx.lineTo(leftAt(1), bottomY); ctx.lineTo(g.x + 2, g.y + g.h - 3);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(rightAt(0), topY); ctx.lineTo(g.x + g.w - 8, g.y + 9);
+    ctx.lineTo(g.x + g.w - 2, g.y + g.h - 3); ctx.lineTo(rightAt(1), bottomY);
+    ctx.closePath(); ctx.fill();
+
+    ctx.lineWidth = .9;
+    for (let col = 0; col <= this.netCols; col++) {
       ctx.beginPath();
-      for (let r = 0; r <= this.netRows; r++) {
-        const n = this.netNodes[r][c];
-        const nx = n.origX + (n.z * 0.22);
-        const ny = n.origY + (n.z * 0.16);
-        if (r === 0) ctx.moveTo(nx, ny);
-        else ctx.lineTo(nx, ny);
+      for (let row = 0; row <= this.netRows; row++) {
+        const point = pointAt(row, col);
+        if (row === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
       }
+      ctx.strokeStyle = col % 4 === 0 ? 'rgba(206,244,255,.55)' : 'rgba(151,207,219,.33)';
+      ctx.stroke();
+    }
+    for (let row = 0; row <= this.netRows; row++) {
+      ctx.beginPath();
+      for (let col = 0; col <= this.netCols; col++) {
+        const point = pointAt(row, col);
+        if (col === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      }
+      ctx.strokeStyle = row % 3 === 0 ? 'rgba(226,248,255,.48)' : 'rgba(151,207,219,.29)';
       ctx.stroke();
     }
 
-    for (let r = 0; r <= this.netRows; r++) {
-      ctx.beginPath();
-      for (let c = 0; c <= this.netCols; c++) {
-        const n = this.netNodes[r][c];
-        const nx = n.origX + (n.z * 0.22);
-        const ny = n.origY + (n.z * 0.16);
-        if (c === 0) ctx.moveTo(nx, ny);
-        else ctx.lineTo(nx, ny);
-      }
-      ctx.stroke();
-    }
+    // Reinforced side cords and rear seam catch the stadium light.
+    ctx.strokeStyle = 'rgba(248,200,96,.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(g.x + 8, g.y + 10); ctx.lineTo(leftAt(1), bottomY);
+    ctx.moveTo(g.x + g.w - 8, g.y + 10); ctx.lineTo(rightAt(1), bottomY);
+    ctx.moveTo(leftAt(0), topY); ctx.lineTo(leftAt(1), bottomY);
+    ctx.moveTo(rightAt(0), topY); ctx.lineTo(rightAt(1), bottomY);
+    ctx.stroke();
     ctx.restore();
   }
 
   renderAnimePosts(ctx) {
     const g = this.goal;
+    const topLeft = { x: g.x + 14, y: g.y + 9 };
+    const topRight = { x: g.x + g.w - 14, y: g.y + 9 };
+    const baseLeft = { x: g.x + 3, y: g.y + g.h - 2 };
+    const baseRight = { x: g.x + g.w - 3, y: g.y + g.h - 2 };
+    const frame = () => {
+      ctx.beginPath();
+      ctx.moveTo(baseLeft.x, baseLeft.y);
+      ctx.lineTo(topLeft.x, topLeft.y);
+      ctx.lineTo(topRight.x, topRight.y);
+      ctx.lineTo(baseRight.x, baseRight.y);
+    };
+
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.fillRect(g.x - 3, g.y + g.h - 3, g.w + 6, 8);
-
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = g.postWidth + 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Turf shadow, then dark carbon supports behind the enamel tubes.
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
     ctx.beginPath();
-    ctx.moveTo(g.x, g.y + g.h);
-    ctx.lineTo(g.x, g.y);
-    ctx.lineTo(g.x + g.w, g.y);
-    ctx.lineTo(g.x + g.w, g.y + g.h);
+    ctx.ellipse(g.x + g.w / 2, g.y + g.h - 1, g.w * .53, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(0,0,0,.9)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
+    ctx.strokeStyle = '#020812'; ctx.lineWidth = 19; frame(); ctx.stroke();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    const metal = ctx.createLinearGradient(g.x, g.y, g.x + g.w, g.y + g.h);
+    metal.addColorStop(0, '#738997');
+    metal.addColorStop(.18, '#f8ffff');
+    metal.addColorStop(.38, '#a9c3d0');
+    metal.addColorStop(.55, '#ffffff');
+    metal.addColorStop(.78, '#879eaa');
+    metal.addColorStop(1, '#f4ffff');
+    ctx.strokeStyle = metal; ctx.lineWidth = 14; frame(); ctx.stroke();
+
+    const enamel = ctx.createLinearGradient(0, g.y, 0, g.y + g.h);
+    enamel.addColorStop(0, '#ffffff'); enamel.addColorStop(.45, '#dcebf1'); enamel.addColorStop(1, '#8ca2ad');
+    ctx.strokeStyle = enamel; ctx.lineWidth = 8; frame(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(topLeft.x - 2, topLeft.y - 1); ctx.lineTo(topRight.x + 2, topRight.y - 1);
+    ctx.moveTo(baseLeft.x - 1, baseLeft.y - 2); ctx.lineTo(topLeft.x - 2, topLeft.y + 5);
+    ctx.moveTo(topRight.x + 2, topRight.y + 5); ctx.lineTo(baseRight.x + 1, baseRight.y - 2);
     ctx.stroke();
 
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = g.postWidth - 2;
-    ctx.stroke();
+    // Small gold joints make the frame read as a built stadium goal.
+    ctx.fillStyle = '#ffd76e'; ctx.shadowColor = '#ffb832'; ctx.shadowBlur = 7;
+    for (const point of [topLeft, topRight]) {
+      ctx.beginPath(); ctx.arc(point.x, point.y + 7, 2.1, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -1405,24 +1672,71 @@ class PenaltisGame {
   renderAnimeBall(ctx) {
     const b = this.ball;
     ctx.save();
+
+    // The shadow stays on the turf while the ball rises toward the goal.
+    const flight = b.inFlight ? b.progress : 0;
+    const shadowX = b.startX + (b.targetX - b.startX) * flight;
+    const shadowY = b.inFlight ? b.startY + (b.targetY - b.startY) * flight * .12 + 18 : b.y + b.radius * b.scale * .72;
+    const shadowScale = b.inFlight ? .82 + flight * .24 : .92;
+    ctx.globalAlpha = b.inFlight ? .25 - flight * .09 : b.inNet ? .16 : .24;
+    ctx.fillStyle = '#02070a';
+    ctx.filter = 'blur(5px)';
+    ctx.beginPath();
+    ctx.ellipse(shadowX, shadowY, b.radius * b.scale * shadowScale, b.radius * b.scale * .3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+
     ctx.translate(b.x, b.y);
     ctx.scale(b.scale, b.scale);
+    ctx.rotate(b.rotation);
+    const radius = b.radius;
 
-    if (b.inFlight) {
-      const angle = Math.atan2(b.targetY - b.startY, b.targetX - b.startX);
-      ctx.rotate(angle);
-      ctx.scale(1.35, 0.75);
-      ctx.rotate(-angle);
+    // A layered, shaded football with stitched panels replaces the flat white token.
+    const sphere = ctx.createRadialGradient(-radius * .38, -radius * .46, radius * .06, 0, 0, radius * 1.12);
+    sphere.addColorStop(0, '#ffffff');
+    sphere.addColorStop(.38, '#f1f7fa');
+    sphere.addColorStop(.78, '#9dafbb');
+    sphere.addColorStop(1, '#243543');
+    ctx.fillStyle = sphere;
+    ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0, 0, radius - 1, 0, Math.PI * 2); ctx.clip();
+    ctx.strokeStyle = 'rgba(22,40,53,.7)'; ctx.lineWidth = 1.25;
+    ctx.fillStyle = '#132333';
+    const polygon = (cx, cy, r, sides, angle = 0, fill = '#132333') => {
+      ctx.fillStyle = fill; ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const a = angle + i * Math.PI * 2 / sides;
+        const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    polygon(0, 0, radius * .31, 5, -Math.PI / 2, '#102235');
+    for (let i = 0; i < 5; i++) {
+      const angle = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      polygon(Math.cos(angle) * radius * .72, Math.sin(angle) * radius * .72, radius * .2, 5, angle, i % 2 ? '#172d40' : '#0e2132');
     }
+    ctx.strokeStyle = 'rgba(18,38,53,.7)'; ctx.lineWidth = .8;
+    for (let i = 0; i < 5; i++) {
+      const angle = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * radius * .31, Math.sin(angle) * radius * .31);
+      ctx.lineTo(Math.cos(angle) * radius * .51, Math.sin(angle) * radius * .51);
+      ctx.stroke();
+    }
+    const sheen = ctx.createRadialGradient(-radius * .45, -radius * .54, 0, -radius * .35, -radius * .45, radius * .8);
+    sheen.addColorStop(0, 'rgba(255,255,255,.48)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sheen; ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+    ctx.restore();
 
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 2.8;
-    ctx.stroke();
-
+    ctx.strokeStyle = b.inFlight ? 'rgba(255,248,216,.95)' : 'rgba(225,241,247,.9)';
+    ctx.lineWidth = b.inFlight ? 2.6 : 2;
+    ctx.shadowColor = b.inFlight ? 'rgba(255,180,59,.75)' : 'rgba(220,245,255,.4)';
+    ctx.shadowBlur = b.inFlight ? 11 : 4;
+    ctx.beginPath(); ctx.arc(0, 0, radius - 1, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
