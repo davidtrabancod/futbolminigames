@@ -37,6 +37,7 @@ class OnlineArena {
       profileSubmitBtn: document.getElementById('profileSubmitBtn'),
       logoutBtn: document.getElementById('logoutBtn'),
       onlineStatus: document.getElementById('onlineStatus'),
+      matchmakingBanner: document.getElementById('matchmakingBanner'),
       goalkeeperRoster: document.getElementById('goalkeeperRoster'),
       goalkeeperSelectionStatus: document.getElementById('goalkeeperSelectionStatus'),
       rankedMatchBtn: document.getElementById('rankedMatchBtn'),
@@ -175,6 +176,7 @@ class OnlineArena {
         this.refs.invitePanel.classList.remove('hidden');
       }
       this.refs.cancelOnlineBtn.classList.remove('hidden');
+      this.setMatchmakingLoading(state.status === 'queued');
       this.refs.rankedMatchBtn.disabled = true;
       this.refs.createFriendlyBtn.disabled = true;
       this.startMatchPolling(state.matchId || null);
@@ -311,6 +313,11 @@ class OnlineArena {
     this.refs.onlineStatus.textContent = message;
     this.refs.onlineStatus.classList.toggle('is-error', state === 'error');
     this.refs.onlineStatus.classList.toggle('is-success', state === 'success');
+    if (state === 'error') this.setMatchmakingLoading(false);
+  }
+
+  setMatchmakingLoading(visible) {
+    this.refs.matchmakingBanner?.classList.toggle('hidden', !visible);
   }
 
   openProfile() {
@@ -463,6 +470,7 @@ class OnlineArena {
       }
       if (state.progress) this.showActionProgress(state.progress);
 
+      this.setMatchmakingLoading(state.status === 'queued');
       if (state.status === 'queued') this.setOnlineStatus('Buscando rival. Te avisaremos en cuanto empiece el duelo.');
       if (state.status === 'waiting' && this.currentMode === 'friendly') this.setOnlineStatus('Invitación lista. Esperando a tu amigo.');
       if (state.status === 'finished' || state.status === 'expired' || state.status === 'cancelled' || state.status === 'idle') {
@@ -489,6 +497,7 @@ class OnlineArena {
   }
 
   resetOnlineControls() {
+    this.setMatchmakingLoading(false);
     this.refs.cancelOnlineBtn.classList.add('hidden');
     this.refs.rankedMatchBtn.disabled = false;
     this.refs.createFriendlyBtn.disabled = false;
@@ -496,10 +505,11 @@ class OnlineArena {
   }
 
   async startRankedQueue() {
+    this.setMatchmakingLoading(true);
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
-    this.setOnlineStatus('Buscando un jugador real. La búsqueda seguirá activa hasta encontrar rival.');
+    this.setOnlineStatus('Buscando rival para el duelo…');
     try {
       if (this.useServerlessMatchApi) {
         const result = await this.requestMatchApi({ action: 'queue' });
@@ -510,6 +520,7 @@ class OnlineArena {
       await this.ensureSocket();
       this.send({ type: 'queue-ranked' });
     } catch (error) {
+      this.setMatchmakingLoading(false);
       this.refs.cancelOnlineBtn.classList.add('hidden');
       this.refs.rankedMatchBtn.disabled = false;
       this.refs.createFriendlyBtn.disabled = false;
@@ -518,6 +529,7 @@ class OnlineArena {
   }
 
   async createFriendlyMatch() {
+    this.setMatchmakingLoading(false);
     this.currentMode = 'friendly';
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
@@ -543,6 +555,7 @@ class OnlineArena {
   }
 
   async joinFriendlyMatch() {
+    this.setMatchmakingLoading(false);
     const code = this.refs.inviteCodeInput.value.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(code)) return;
     this.refs.cancelOnlineBtn.classList.remove('hidden');
@@ -567,6 +580,7 @@ class OnlineArena {
   }
 
   cancelQueue() {
+    this.setMatchmakingLoading(false);
     if (this.useServerlessMatchApi) {
       this.stopMatchPolling();
       this.requestMatchApi({ action: 'cancel' }).catch(() => {});
@@ -595,12 +609,15 @@ class OnlineArena {
         this.setOnlineStatus('Invitación lista. Comparte el código con tu amigo.', 'success');
         break;
       case 'queue-wait':
-        this.setOnlineStatus('Buscando a otro jugador online…');
+        this.setMatchmakingLoading(true);
+        this.setOnlineStatus('Buscando rival online…');
         break;
       case 'queue-matched':
+        this.setMatchmakingLoading(false);
         this.setOnlineStatus('Rival encontrado. Preparando el duelo…', 'success');
         break;
       case 'cancelled':
+        this.setMatchmakingLoading(false);
         this.refs.cancelOnlineBtn.classList.add('hidden');
         this.refs.rankedMatchBtn.disabled = false;
         this.refs.createFriendlyBtn.disabled = false;
@@ -608,6 +625,7 @@ class OnlineArena {
         this.setOnlineStatus('Búsqueda cancelada. Puedes volver a buscar rival.');
         break;
       case 'error':
+        this.setMatchmakingLoading(false);
         this.refs.cancelOnlineBtn.classList.add('hidden');
         this.refs.rankedMatchBtn.disabled = false;
         this.refs.createFriendlyBtn.disabled = false;
@@ -632,6 +650,7 @@ class OnlineArena {
   }
 
   beginMatch(message) {
+    this.setMatchmakingLoading(false);
     if (message.matchId) this.matchId = message.matchId;
     this.currentMode = message.mode;
     this.playerIndex = message.playerIndex;

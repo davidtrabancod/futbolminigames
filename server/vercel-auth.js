@@ -42,6 +42,7 @@ async function ensureSchema(sql) {
       )`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT FALSE`;
       await sql`CREATE INDEX IF NOT EXISTS sessions_user_id ON sessions(user_id)`;
       await sql`CREATE INDEX IF NOT EXISTS users_leaderboard ON users(rating DESC, wins DESC, nickname_key ASC)`;
       await sql`CREATE TABLE IF NOT EXISTS auth_attempts (
@@ -273,7 +274,7 @@ function createHandler(endpoint) {
       if (endpoint === 'leaderboard' && method === 'GET') {
         const entries = await sql`SELECT ROW_NUMBER() OVER (ORDER BY rating DESC, wins DESC, nickname_key ASC)::INTEGER AS rank,
           nickname, avatar, rating, wins, matches FROM users
-          ORDER BY rating DESC, wins DESC, nickname_key ASC LIMIT 50`;
+          WHERE is_bot = FALSE ORDER BY rating DESC, wins DESC, nickname_key ASC LIMIT 50`;
         return setJson(res, 200, { entries });
       }
 

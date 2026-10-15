@@ -2753,3 +2753,94 @@ body > footer {
 @keyframes playPanelCharge { 0%,100%{opacity:.55} 50%{opacity:1} }
 @keyframes playButtonPulse { 0%,100%{filter:brightness(1);box-shadow:0 6px 0 rgba(0,0,0,.36),0 0 15px rgba(67,255,179,.15)} 50%{filter:brightness(1.08);box-shadow:0 6px 0 rgba(0,0,0,.36),0 0 27px rgba(67,255,179,.32)} }
 @media (prefers-reduced-motion:reduce) { .online-hub__play::before,.online-hub__play .online-action:first-child { animation:none; } }
+
+.matchmaking-banner {
+  display: grid;
+  grid-template-columns: 4.7rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.15rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 219, 91, .75);
+  border-radius: .8rem;
+  background: linear-gradient(120deg, rgba(5, 19, 30, .98), rgba(8, 54, 53, .96));
+  box-shadow: 0 0 0 1px rgba(255, 218, 79, .13), 0 0 28px rgba(255, 213, 63, .2), inset 0 1px rgba(255, 255, 255, .12);
+  animation: matchmakingEnter .28s ease-out both;
+}
+.matchmaking-banner.hidden { display: none; }
+.matchmaking-banner:not(.hidden) + .online-status { display: none; }
+.matchmaking-banner:not(.hidden) ~ .online-text-button:not(.hidden) {
+  display: block;
+  width: max-content;
+  margin: .8rem auto .2rem;
+  color: #ffe684;
+  font-family: var(--font-kids);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.matchmaking-banner__radar {
+  position: relative;
+  display: grid;
+  width: 4.7rem;
+  height: 4.7rem;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(62, 225, 173, .21) 0 27%, rgba(8, 36, 41, .95) 30% 61%, transparent 63%);
+}
+.matchmaking-banner__radar::before,
+.matchmaking-banner__radar::after {
+  position: absolute;
+  inset: .25rem;
+  border-radius: 50%;
+  content: "";
+}
+.matchmaking-banner__radar::before {
+  border: 2px dashed rgba(105, 251, 193, .65);
+  animation: matchmakingSpin 5s linear infinite;
+}
+.matchmaking-banner__radar::after {
+  inset: 0;
+  border: 2px solid transparent;
+  border-top-color: #ffde72;
+  border-right-color: #ffde72;
+  filter: drop-shadow(0 0 7px rgba(255, 216, 79, .7));
+  animation: matchmakingSpin 1.8s linear infinite;
+}
+.matchmaking-banner__radar span { z-index: 1; font-size: 1.9rem; filter: drop-shadow(0 0 10px rgba(117, 244, 204, .55)); }
+.matchmaking-banner__copy { min-width: 0; }
+.matchmaking-banner__eyebrow { display: block; color: #74f5c5; font: 700 .6rem var(--font-kids); letter-spacing: .18em; }
+.matchmaking-banner__copy strong {
+  display: flex;
+  align-items: baseline;
+  gap: .15rem;
+  margin-top: .2rem;
+  color: #ffe684;
+  font: 900 clamp(1.15rem, 3vw, 1.6rem) var(--font-display);
+  letter-spacing: .055em;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(255, 212, 68, .34);
+}
+.matchmaking-banner__copy p { margin: .4rem 0 .7rem; color: #d6eee5; font-size: .77rem; line-height: 1.35; }
+.matchmaking-banner__dots { display: inline-flex; gap: .17rem; padding-left: .14rem; }
+.matchmaking-banner__dots i { width: .2rem; height: .2rem; border-radius: 50%; background: currentColor; animation: matchmakingDot 1.15s ease-in-out infinite; }
+.matchmaking-banner__dots i:nth-child(2) { animation-delay: .16s; }
+.matchmaking-banner__dots i:nth-child(3) { animation-delay: .32s; }
+.matchmaking-banner__track { display: block; height: .28rem; overflow: hidden; border-radius: 1rem; background: rgba(114, 245, 197, .17); }
+.matchmaking-banner__track span { display: block; width: 38%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, transparent, #6ff6c1, #ffe27c); box-shadow: 0 0 10px #7af8c8; animation: matchmakingScan 2.4s ease-in-out infinite; }
+@keyframes matchmakingEnter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes matchmakingSpin { to { transform: rotate(360deg); } }
+@keyframes matchmakingDot { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+@keyframes matchmakingScan { from { transform: translateX(-110%); } to { transform: translateX(280%); } }
+@media (max-width: 480px) {
+  .matchmaking-banner { grid-template-columns: 3.6rem minmax(0, 1fr); gap: .7rem; padding: .8rem; }
+  .matchmaking-banner__radar { width: 3.6rem; height: 3.6rem; }
+  .matchmaking-banner__radar span { font-size: 1.5rem; }
+  .matchmaking-banner__copy strong { font-size: 1.08rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .matchmaking-banner,
+  .matchmaking-banner__radar::before,
+  .matchmaking-banner__radar::after,
+  .matchmaking-banner__dots i,
+  .matchmaking-banner__track span { animation: none; }
+}

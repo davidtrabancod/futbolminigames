@@ -90,6 +90,13 @@ async function ensureSchema(sql) {
       )`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT FALSE`;
+      const botSalt = crypto.randomBytes(16).toString('hex');
+      const botHash = crypto.randomBytes(48).toString('hex');
+      const schemaNow = Date.now();
+      await sql`INSERT INTO users(nickname, nickname_key, avatar, password_salt, password_hash, rating, wins, losses, matches, keeper_id, created_at, updated_at, is_bot)
+        VALUES ('Nico_17', 'arena_bot_nico_17', '🧤', ${botSalt}, ${botHash}, 1000, 4, 7, 11, 'rookie', ${schemaNow}, ${schemaNow}, TRUE)
+        ON CONFLICT (nickname_key) DO NOTHING`;
       await sql`CREATE INDEX IF NOT EXISTS online_matches_players_state ON online_matches(player_one, player_two, state)`;
       await sql`CREATE TABLE IF NOT EXISTS online_queue (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -117,9 +124,9 @@ async function ensureSchema(sql) {
             'id', u.id, 'nickname', u.nickname, 'avatar', u.avatar, 'keeperId', u.keeper_id,
             'rating', u.rating, 'rank', (
               SELECT COUNT(*)::INTEGER + 1 FROM users better
-              WHERE better.rating > u.rating
+              WHERE better.is_bot = FALSE AND (better.rating > u.rating
                  OR (better.rating = u.rating AND better.wins > u.wins)
-                 OR (better.rating = u.rating AND better.wins = u.wins AND better.nickname_key < u.nickname_key)
+                 OR (better.rating = u.rating AND better.wins = u.wins AND better.nickname_key < u.nickname_key))
             ),
             'wins', u.wins, 'losses', u.losses, 'matches', u.matches, 'winStreak', u.win_streak
           ) FROM users u WHERE u.id = p_user_id
@@ -157,6 +164,28 @@ async function ensureSchema(sql) {
               'message', CASE WHEN i = 0 THEN 'Elige dónde lanzar.' ELSE 'Elige dónde cubrir la portería.' END
             ), (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT);
           END LOOP;
+        END
+        $function$`;
+
+      await sql`CREATE OR REPLACE FUNCTION arena_assign_bot(p_user_id INTEGER, p_match_id TEXT) RETURNS TEXT
+        LANGUAGE plpgsql AS $function$
+        DECLARE queued_at BIGINT; bot_id INTEGER; existing_id TEXT;
+        BEGIN
+          PERFORM pg_advisory_xact_lock(48127011, 1);
+          SELECT id INTO existing_id FROM online_matches WHERE state IN ('waiting', 'active')
+            AND (player_one = p_user_id OR player_two = p_user_id) ORDER BY created_at DESC LIMIT 1;
+          IF existing_id IS NOT NULL THEN RETURN existing_id; END IF;
+          SELECT created_at INTO queued_at FROM online_queue WHERE user_id = p_user_id FOR UPDATE;
+          IF queued_at IS NULL OR (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT - queued_at < 15000 THEN RETURN NULL; END IF;
+          SELECT id INTO bot_id FROM users WHERE is_bot = TRUE ORDER BY id LIMIT 1;
+          IF bot_id IS NULL THEN RETURN NULL; END IF;
+          DELETE FROM online_queue WHERE user_id = p_user_id;
+          INSERT INTO online_matches(id, mode, state, player_one, player_two, created_at, updated_at)
+            VALUES (p_match_id, 'ranked', 'waiting', p_user_id, bot_id,
+              (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT,
+              (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT);
+          PERFORM arena_start_match(p_match_id);
+          RETURN p_match_id;
         END
         $function$`;
 
@@ -427,6 +456,27 @@ async function handleRequest(req, res) {
   }
 }
 
+async function continueBotTurn(sql, matchId, now) {
+  const [match] = await sql`SELECT m.id, m.player_one, m.player_two, m.next_shooter, m.shot_zone, m.save_zone,
+      m.turn_started_at, m.state, bot.id AS bot_id
+    FROM online_matches m JOIN users bot ON bot.id = m.player_two AND bot.is_bot = TRUE
+    WHERE m.id = ${matchId}`;
+  if (!match || match.state !== 'active' || now - Number(match.turn_started_at || now) < 700) return;
+
+  const botIsShooter = Number(match.next_shooter) === 1;
+  let zone;
+  if (botIsShooter) {
+    if (match.shot_zone != null) return;
+    zone = ZONES[Math.floor(Math.random() * ZONES.length)];
+  } else {
+    if (match.shot_zone == null || match.save_zone != null) return;
+    zone = Math.random() < 0.27
+      ? match.shot_zone
+      : ZONES.filter(candidate => candidate !== match.shot_zone)[Math.floor(Math.random() * (ZONES.length - 1))];
+  }
+  await sql`SELECT arena_submit_action(${match.bot_id}, ${matchId}, ${zone})`;
+}
+
 async function pollMatch(sql, userId, body) {
   let match;
   if (typeof body.matchId === 'string' && body.matchId) {
@@ -437,7 +487,11 @@ async function pollMatch(sql, userId, body) {
     [match] = await sql`SELECT * FROM online_matches WHERE state IN ('waiting', 'active')
       AND (player_one = ${userId} OR player_two = ${userId}) ORDER BY created_at DESC LIMIT 1`;
     if (!match) {
-      const [queued] = await sql`SELECT user_id FROM online_queue WHERE user_id = ${userId}`;
+      const [queued] = await sql`SELECT created_at FROM online_queue WHERE user_id = ${userId}`;
+      if (queued && Date.now() - Number(queued.created_at) >= 15000) {
+        const [assigned] = await sql`SELECT arena_assign_bot(${userId}, ${crypto.randomUUID()}) AS match_id`;
+        if (assigned?.match_id) return pollMatch(sql, userId, { ...body, matchId: assigned.match_id });
+      }
       return { status: queued ? 'queued' : 'idle', events: [], cursor: Number(body.cursor) || 0 };
     }
   }
@@ -451,11 +505,13 @@ async function pollMatch(sql, userId, body) {
   }
 
   if (match.state === 'active') {
+    await continueBotTurn(sql, match.id, now);
+    [match] = await sql`SELECT * FROM online_matches WHERE id = ${match.id}`;
     await sql`INSERT INTO online_match_presence(match_id, user_id, last_seen) VALUES (${match.id}, ${userId}, ${now})
       ON CONFLICT (match_id, user_id) DO UPDATE SET last_seen = EXCLUDED.last_seen`;
-    const [opponentPresence] = await sql`SELECT last_seen FROM online_match_presence
-      WHERE match_id = ${match.id} AND user_id = ${opponentId}`;
-    if (opponentPresence && now - Number(opponentPresence.last_seen) > PRESENCE_TIMEOUT_MS) {
+    const [opponentPresence] = await sql`SELECT p.last_seen, u.is_bot FROM online_match_presence p
+      JOIN users u ON u.id = p.user_id WHERE p.match_id = ${match.id} AND p.user_id = ${opponentId}`;
+    if (opponentPresence && !opponentPresence.is_bot && now - Number(opponentPresence.last_seen) > PRESENCE_TIMEOUT_MS) {
       await sql`SELECT arena_finish_match(${match.id}, ${playerIndex}, 'disconnect')`;
     } else if (match.turn_started_at && now - Number(match.turn_started_at) > ACTION_TIMEOUT_MS) {
       const idleIndex = match.shot_zone == null ? match.next_shooter : 1 - match.next_shooter;

@@ -188,12 +188,13 @@ function userForMatch(user) {
   return { id: user.id, nickname: user.nickname, avatar: user.avatar, keeperId: user.keeperId || 'rookie', rating: user.rating, rank: user.rank, wins: user.wins, matches: user.matches };
 }
 
-function createMatch({ players, mode }) {
+function createMatch({ players, mode, botIndex = null }) {
   const id = crypto.randomUUID();
   const match = {
     id,
     mode,
     players,
+    botIndex,
     connections: players.map(player => clientsByUser.get(player.id)),
     scores: [0, 0],
     shots: [0, 0],
@@ -201,6 +202,7 @@ function createMatch({ players, mode }) {
     suddenDeath: false,
     turnActions: { shot: null, save: null },
     turnTimer: null,
+    botTimer: null,
     ended: false,
     history: []
   };
@@ -263,6 +265,8 @@ function startTurn(match) {
     finishMatch(match, 1 - idleIndex, 'forfeit');
   }, ACTION_TIMEOUT_MS);
 
+  scheduleBotAction(match);
+
   if (match.turnActions.shot !== null && match.turnActions.save !== null) resolveTurn(match);
 }
 
@@ -299,11 +303,33 @@ function handleMatchAction(ws, message) {
   match.turnActions[role] = message.zone;
   sendMatchState(match);
   if (match.turnActions.shot !== null && match.turnActions.save !== null) resolveTurn(match);
+  else scheduleBotAction(match);
+}
+
+function scheduleBotAction(match) {
+  if (match.ended || match.botIndex == null || match.botTimer) return;
+  const botIsShooter = match.nextShooter === match.botIndex;
+  const slot = botIsShooter ? 'shot' : 'save';
+  if (match.turnActions[slot] !== null) return;
+  if (!botIsShooter && match.turnActions.shot === null) return;
+  match.botTimer = setTimeout(() => {
+    match.botTimer = null;
+    if (match.ended) return;
+    const zone = botIsShooter
+      ? ZONES[Math.floor(Math.random() * ZONES.length)]
+      : (Math.random() < 0.27
+        ? match.turnActions.shot
+        : ZONES.filter(item => item !== match.turnActions.shot)[Math.floor(Math.random() * (ZONES.length - 1))]);
+    match.turnActions[slot] = zone;
+    sendMatchState(match);
+    if (match.turnActions.shot !== null && match.turnActions.save !== null) resolveTurn(match);
+  }, 650 + Math.floor(Math.random() * 700));
 }
 
 function resolveTurn(match) {
   if (match.ended || match.turnActions.shot === null || match.turnActions.save === null) return;
   clearTimeout(match.turnTimer);
+  clearTimeout(match.botTimer);
   const shooterIndex = match.nextShooter;
   const keeperIndex = 1 - shooterIndex;
   const shotZone = match.turnActions.shot;
@@ -339,6 +365,7 @@ function finishMatch(match, winnerIndex, reason) {
   if (match.ended) return;
   match.ended = true;
   clearTimeout(match.turnTimer);
+  clearTimeout(match.botTimer);
   matches.delete(match.id);
   const ratings = database.saveMatch({
     id: match.id,
@@ -346,6 +373,7 @@ function finishMatch(match, winnerIndex, reason) {
     players: match.players,
     scores: match.scores,
     winnerIndex,
+    botIndex: match.botIndex,
     suddenDeath: match.suddenDeath
   });
   match.connections.forEach((ws, index) => {
@@ -398,7 +426,23 @@ function handleSocketMessage(ws, rawData) {
 
     ws.queueState = 'ranked';
     sendSocket(ws, { type: 'queue-wait' });
-    queue.push({ ws, timer: null });
+    const entry = { ws, timer: null };
+    entry.timer = setTimeout(() => {
+      const index = queue.indexOf(entry);
+      if (index < 0 || ws.readyState !== WebSocket.OPEN) return;
+      queue.splice(index, 1);
+      ws.queueState = null;
+      sendSocket(ws, { type: 'queue-matched' });
+      createMatch({
+        players: [ws.arenaUser, {
+          id: null, nickname: 'Nico_17', avatar: '🧤', keeperId: 'rookie', rating: ws.arenaUser.rating,
+          rank: 0, wins: 4, matches: 11
+        }],
+        mode: 'ranked',
+        botIndex: 1
+      });
+    }, 12_000);
+    queue.push(entry);
     return;
   }
 
