@@ -1,6 +1,6 @@
 {
-  "name": "Futbolín Kids Arena - Penaltis Online",
-  "short_name": "Futbolín Kids",
+  "name": "Penalty Rush - Penaltis Online",
+  "short_name": "Penalty Rush",
   "description": "Duelos de penaltis online 1 contra 1. Juega con rivales o invita a tus amigos.",
   "start_url": "./index.html",
   "display": "standalone",
@@ -11,7 +11,7 @@
   "categories": ["games", "sports", "kids"],
   "icons": [
     {
-      "src": "./favicon.svg",
+      "src": "./penalty-rush.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

@@ -1,52 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#22c55e" />
-      <stop offset="100%" stop-color="#15803d" />
-    </linearGradient>
-    <radialGradient id="ballShine" cx="35%" cy="35%" r="65%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="75%" stop-color="#e2e8f0" />
-      <stop offset="100%" stop-color="#94a3b8" />
-    </radialGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#052e16" flood-opacity="0.4" />
-    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#102a3a"/><stop offset="1" stop-color="#030a12"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff08a"/><stop offset="1" stop-color="#ff9c27"/></linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
-  
-  <!-- Outer Rounded Shield -->
-  <rect x="4" y="4" width="120" height="120" rx="32" fill="url(#bgGrad)" stroke="#facc15" stroke-width="4" filter="url(#shadow)"/>
-  
-  <!-- Pitch Lines -->
-  <circle cx="64" cy="64" r="50" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.3" stroke-dasharray="4 4"/>
-  <line x1="14" y1="64" x2="114" y2="64" stroke="#ffffff" stroke-width="2" stroke-opacity="0.3"/>
-
-  <!-- Soccer Ball Base -->
-  <circle cx="64" cy="64" r="38" fill="url(#ballShine)" stroke="#0f172a" stroke-width="3" filter="url(#shadow)"/>
-  
-  <!-- Central Pentagon -->
-  <polygon points="64,48 76,57 71,72 57,72 52,57" fill="#0f172a"/>
-  
-  <!-- Outer Pentagon Patches & Lines -->
-  <!-- Top -->
-  <line x1="64" y1="48" x2="64" y2="28" stroke="#0f172a" stroke-width="3"/>
-  <polygon points="64,28 54,34 50,26 64,26 78,26 74,34" fill="#0f172a"/>
-  <!-- Top Right -->
-  <line x1="76" y1="57" x2="94" y2="48" stroke="#0f172a" stroke-width="3"/>
-  <polygon points="94,48 98,60 102,52 94,38" fill="#0f172a"/>
-  <!-- Bottom Right -->
-  <line x1="71" y1="72" x2="85" y2="88" stroke="#0f172a" stroke-width="3"/>
-  <polygon points="85,88 74,96 82,101 94,93" fill="#0f172a"/>
-  <!-- Bottom Left -->
-  <line x1="57" y1="72" x2="43" y2="88" stroke="#0f172a" stroke-width="3"/>
-  <polygon points="43,88 54,96 46,101 34,93" fill="#0f172a"/>
-  <!-- Top Left -->
-  <line x1="52" y1="57" x2="34" y2="48" stroke="#0f172a" stroke-width="3"/>
-  <polygon points="34,48 30,60 26,52 34,38" fill="#0f172a"/>
-
-  <!-- Gold Star on Top Corner -->
-  <g transform="translate(90, 16) scale(0.9)">
-    <polygon points="12,0 15,9 24,9 17,15 20,24 12,18 4,24 7,15 0,9 9,9" fill="#facc15" stroke="#ca8a04" stroke-width="1.5"/>
-  </g>
+  <rect x="5" y="5" width="118" height="118" rx="25" fill="url(#bg)" stroke="#04e6b0" stroke-width="3"/>
+  <path d="M18 28h92M18 100h92M26 29v70m76-70v70" fill="none" stroke="#16c9e4" stroke-opacity=".45" stroke-width="2"/>
+  <path d="M31 89 64 24l33 65-33 16z" fill="#071621" stroke="url(#gold)" stroke-width="3"/>
+  <path d="m43 72 21-42 21 42-21 24z" fill="#0a2633" stroke="#04e6b0" stroke-width="2"/>
+  <circle cx="64" cy="66" r="15" fill="url(#gold)" stroke="#fff1a1" stroke-width="2" filter="url(#glow)"/>
+  <path d="m64 58 5 4-2 7h-6l-2-7zm0-8v8m7-4 7-4m-5 17 5 6m-14 0-5 6m-2-18-7-4" fill="none" stroke="#102238" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M27 108h74" stroke="#ffae35" stroke-width="3"/>
 </svg>
-

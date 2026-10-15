@@ -316,17 +316,21 @@ class OnlineArena {
       card.dataset.rarity = keeper.unlockRating >= 2000 ? 'legendary' : keeper.unlockRating >= 1600 ? 'epic' : keeper.unlockRating >= 1200 ? 'rare' : 'starter';
       card.style.setProperty('--keeper-accent', keeper.colors[0]);
       card.style.setProperty('--keeper-trim', keeper.colors[2]);
-      card.disabled = !unlocked || selected || !this.user || this.user.isGuest;
+      card.disabled = selected;
       card.setAttribute('aria-label', `${keeper.name}: ${unlocked ? (selected ? 'equipado' : 'seleccionar') : `se desbloquea con ${keeper.unlockRating} puntos`}`);
       const portrait = document.createElement('canvas');
       portrait.className = 'keeper-card__portrait';
       portrait.setAttribute('aria-hidden', 'true');
+      const lockNotice = document.createElement('span');
+      lockNotice.className = 'keeper-card__lock-notice';
+      lockNotice.setAttribute('aria-live', 'polite');
+      lockNotice.textContent = `BLOQUEADO · ${keeper.unlockRating} PTS`;
       const info = document.createElement('span'); info.className = 'keeper-card__info';
       const name = document.createElement('strong'); name.textContent = keeper.name;
       const title = document.createElement('small'); title.textContent = keeper.title;
       const badge = document.createElement('span'); badge.className = 'keeper-card__badge';
       badge.textContent = selected ? 'EQUIPADO' : unlocked ? 'DESBLOQUEADO' : `${keeper.unlockRating} PTS`;
-      info.append(name, title, badge); card.append(portrait, info); host.append(card);
+      info.append(name, title, badge); card.append(portrait, lockNotice, info); host.append(card);
       library.paintPortrait(portrait, keeper, selected);
     });
     this.refs.goalkeeperSelectionStatus.textContent = !this.user || this.user.isGuest
@@ -335,6 +339,17 @@ class OnlineArena {
   }
 
   async selectGoalkeeper(id) {
+    const keeper = window.GOALKEEPER_ROSTER.byId(id);
+    const rating = this.user?.isGuest ? 1000 : Number(this.user?.rating) || 1000;
+    if (rating < keeper.unlockRating) {
+      const card = this.refs.goalkeeperRoster.querySelector(`[data-keeper-id="${keeper.id}"]`);
+      if (card) {
+        card.classList.add('is-notice-visible');
+        window.clearTimeout(card.lockNoticeTimer);
+        card.lockNoticeTimer = window.setTimeout(() => card.classList.remove('is-notice-visible'), 1800);
+      }
+      return;
+    }
     if (!this.user || this.user.isGuest) { this.openProfile(); return; }
     this.refs.goalkeeperSelectionStatus.textContent = 'Guardando elección…';
     try {

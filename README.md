@@ -1,4 +1,4 @@
-# Futbolín Kids Arena
+# Penalty Rush
 
 Juego arcade de penaltis online 1 contra 1. Busca rival, invita a un amigo a una partida privada, compite por puntos y desbloquea porteros para los duelos.
 

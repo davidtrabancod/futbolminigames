@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Futbolín Kids Arena - Estilos Específicos y Animaciones Infantiles
+   Penalty Rush - Estilos arcade y animaciones
    Optimizado para Mobile-First, Máximo Rendimiento y Accesibilidad Infantil
    ========================================================================== */
 
@@ -2700,6 +2700,17 @@ body > footer {
 .keeper-card:disabled { cursor:default; }
 .keeper-card.is-equipped { border-color:var(--keeper-trim); box-shadow:0 0 22px color-mix(in srgb,var(--keeper-accent) 42%,transparent),inset 0 0 16px color-mix(in srgb,var(--keeper-accent) 12%,transparent); }
 .keeper-card.is-locked .keeper-card__portrait { filter:grayscale(.82) brightness(.55); }
+.keeper-card__lock-notice {
+  position:absolute; z-index:3; top:.55rem; right:.45rem; left:.45rem;
+  padding:.42rem .35rem; border:1px solid rgba(255,211,84,.78); border-radius:5px;
+  color:#ffe68a; background:rgba(3,12,21,.94); text-align:center;
+  font:900 .62rem var(--font-kids); letter-spacing:.12em;
+  text-shadow:0 0 10px rgba(255,190,52,.55);
+  box-shadow:0 0 16px rgba(255,181,44,.24),inset 0 0 12px rgba(255,188,48,.1);
+  opacity:0; transform:translateY(-5px) scale(.96); pointer-events:none;
+  transition:opacity .16s ease,transform .16s ease;
+}
+.keeper-card.is-notice-visible .keeper-card__lock-notice { opacity:1; transform:translateY(0) scale(1); }
 .keeper-card__portrait { display:block; width:100%; height:156px; }
 .keeper-card__info { position:relative; z-index:1; display:flex; flex-direction:column; gap:2px; padding:.48rem .55rem .55rem; background:linear-gradient(180deg,rgba(5,15,25,.8),rgba(5,15,25,.98)); }
 .keeper-card__info strong { overflow:hidden; color:#fff3ca; font-size:.82rem; text-overflow:ellipsis; white-space:nowrap; }
@@ -3082,3 +3093,12 @@ body > footer {
   .online-hub__heading { padding:.1rem .15rem .8rem; }
   .online-hub__heading h2 { font-size:clamp(1.65rem,7vw,2.15rem); }
 }
+.brand-mark {
+  display:block;
+  width:2.55rem;
+  height:2.55rem;
+  flex:none;
+  filter:drop-shadow(0 0 10px rgba(4,230,176,.4));
+  transition:filter .2s ease,transform .2s ease;
+}
+.group:hover .brand-mark { filter:drop-shadow(0 0 15px rgba(255,190,52,.65)); transform:rotate(-5deg) scale(1.04); }

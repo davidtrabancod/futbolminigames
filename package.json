@@ -1,8 +1,8 @@
 {
-  "name": "futbolin-kids-arena",
+  "name": "penalty-rush",
   "version": "1.0.0",
   "private": true,
-  "description": "Futbolín Kids Arena with persistent accounts and realtime online penalty matches",
+  "description": "Penalty Rush with persistent accounts and realtime online penalty matches",
   "scripts": {
     "start": "node server.js",
     "test": "node --test"
