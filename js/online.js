@@ -720,12 +720,14 @@ class OnlineArena {
     this.refs.onlineOpponentMeta.textContent = isNormal ? 'SIN PUNTOS' : opponent.isGuest ? 'INVITADO' : `${opponent.rating ?? 1000} pts`;
 
     if (this.app.gameScreen) this.app.gameScreen.classList.remove('hidden');
+    this.app.resizeCanvas?.();
     if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.add('hidden');
     this.refs.forfeitOnlineBtn.classList.remove('hidden');
     document.getElementById('pauseBtn')?.classList.add('hidden');
     this.refs.onlineMatchResult.classList.add('hidden');
     this.refs.cancelOnlineBtn.classList.add('hidden');
     if (this.app.menuScreen) this.app.menuScreen.classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'instant' });
 
     this.updateScoreboard(message.scores, message.shots, false);
 
@@ -763,6 +765,7 @@ class OnlineArena {
       this.app.activeGameId = 'penaltis';
       this.app.activeGame = this.app.games.penaltis;
       this.app.gameState = 'playing';
+      this.app.renderErrorLogged = false;
       if (typeof this.app.games.penaltis.setOnlineMode === 'function') {
         this.app.games.penaltis.setOnlineMode(message, (zoneId) => {
           this.submitZoneAction(zoneId);

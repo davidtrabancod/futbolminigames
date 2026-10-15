@@ -74,6 +74,7 @@ class App {
       this.scaleFactorY = this.canvas.clientHeight / this.virtualHeight;
     };
 
+    this.resizeCanvas = resize;
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', resize);
     resize();
@@ -222,10 +223,12 @@ class App {
     this.activeGameId = gameId;
     this.activeGame = this.games[gameId];
     this.gameState = 'playing';
+    this.renderErrorLogged = false;
 
     this.menuScreen.classList.add('hidden');
     this.onlineMatchScreen.classList.add('hidden');
     this.gameScreen.classList.remove('hidden');
+    this.resizeCanvas?.();
     this.pauseModal.classList.add('hidden');
     this.gameOverModal.classList.add('hidden');
     this.pauseBtn.classList.remove('hidden');
@@ -240,11 +243,13 @@ class App {
     this.activeGameId = 'penaltis';
     this.activeGame = this.games.penaltis;
     this.gameState = 'playing';
+    this.renderErrorLogged = false;
 
     // Ocultar pantallas de menú y mostrar el canvas de juego general
     this.menuScreen.classList.add('hidden');
     this.onlineMatchScreen.classList.add('hidden');
     this.gameScreen.classList.remove('hidden');
+    this.resizeCanvas?.();
     document.getElementById('pauseBtn')?.classList.add('hidden');
     document.getElementById('forfeitOnlineBtn')?.classList.remove('hidden');
     this.pauseModal.classList.add('hidden');
@@ -350,15 +355,37 @@ class App {
     const dt = Math.min((currentTime - this.lastTime) / 1000, 0.1);
     this.lastTime = currentTime;
 
-    if (this.gameState === 'playing' && this.activeGame) {
-      this.ctx.clearRect(0, 0, this.virtualWidth, this.virtualHeight);
-      this.activeGame.update(dt);
-      this.activeGame.render(this.ctx);
-      window.confettiEngine.update();
-      window.confettiEngine.render(this.ctx);
+    try {
+      if (this.gameState === 'playing' && this.activeGame) {
+        this.ctx.clearRect(0, 0, this.virtualWidth, this.virtualHeight);
+        this.activeGame.update(dt);
+        this.activeGame.render(this.ctx);
+        window.confettiEngine.update();
+        window.confettiEngine.render(this.ctx);
+      }
+    } catch (error) {
+      // Keep the animation loop alive so a transient canvas error cannot strand
+      // the player on an empty screen. The exception remains visible in DevTools.
+      if (!this.renderErrorLogged) {
+        this.renderErrorLogged = true;
+        console.error('Error al renderizar la partida:', error);
+      }
+      this.ctx.save();
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.ctx.fillStyle = '#06151a';
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.scale(this.canvas.width / this.virtualWidth, this.canvas.height / this.virtualHeight);
+      this.ctx.textAlign = 'center';
+      this.ctx.fillStyle = '#ffe36e';
+      this.ctx.font = '900 18px Barlow Condensed, sans-serif';
+      this.ctx.fillText('NO SE PUDO CARGAR LA PARTIDA', 200, 285);
+      this.ctx.fillStyle = '#b8d8d4';
+      this.ctx.font = '600 13px Chakra Petch, sans-serif';
+      this.ctx.fillText('Pulsa MENÚ y vuelve a entrar en la partida.', 200, 315);
+      this.ctx.restore();
+    } finally {
+      requestAnimationFrame((t) => this.gameLoop(t));
     }
-
-    requestAnimationFrame((t) => this.gameLoop(t));
   }
 }
 
