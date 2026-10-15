@@ -1,62 +1,10 @@
 /**
  * Futbolín Kids Arena - Efectos de sonido Web Audio API y música externa por destino.
  */
-const COUNTRY_MUSIC_TRACKS = {
-  tokyo: {
-    url: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/Koto_performance.ogg',
-    title: 'Koto performance',
-    artist: 'Torsodog',
-    license: 'CC BY 3.0',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Koto_performance.ogg',
-    loopStart: 2.5,
-    loopEnd: 14.5
-  },
-  rio: {
-    url: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Audionautix-com-ccby-sidewayssamba.mp3',
-    title: 'Sideways Samba',
-    artist: 'Jason Shaw (Audionautix)',
-    license: 'CC BY 3.0',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Audionautix-com-ccby-sidewayssamba.mp3',
-    loopStart: 73,
-    loopEnd: 89
-  },
-  munich: {
-    url: 'https://upload.wikimedia.org/wikipedia/commons/9/9b/Super_Polka_%28ISRC_USUAN1100056%29.mp3',
-    title: 'Super Polka',
-    artist: 'Kevin MacLeod',
-    license: 'CC BY 3.0',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Super_Polka_(ISRC_USUAN1100056).mp3',
-    loopStart: 30.5,
-    loopEnd: 42.5
-  },
-  milan: {
-    url: 'https://upload.wikimedia.org/wikipedia/commons/4/4c/Tarantella.ogg',
-    title: 'Tarantella napoletana',
-    artist: 'United States Air Force Band, Air Force Strings',
-    license: 'Dominio público',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tarantella.ogg',
-    loopStart: 49,
-    loopEnd: 61
-  },
-  madrid: {
-    url: 'https://upload.wikimedia.org/wikipedia/commons/9/92/Flamenco_sample_by_FRANCISCOKEEP.ogg',
-    title: 'Flamenco',
-    artist: 'FranciscoKeep DJ Producciones',
-    license: 'CC BY 3.0',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Flamenco_sample_by_FRANCISCOKEEP.ogg',
-    loopStart: 52.5,
-    loopEnd: 68.5
-  }
-};
-
 class SoundManager {
   constructor() {
     this.ctx = null;
     this.muted = localStorage.getItem('fka_muted') === 'true';
-    this.countryMusicAudio = null;
-    this.countryMusicCountry = null;
-    this.countryMusicPaused = false;
-    this.countryMusicReady = false;
   }
 
   // Inicializa o reanuda el AudioContext con la primera interacción del usuario
@@ -75,101 +23,11 @@ class SoundManager {
   toggleMute() {
     this.muted = !this.muted;
     localStorage.setItem('fka_muted', this.muted);
-    this.updateCountryMusicVolume();
     return this.muted;
   }
 
   isMuted() {
     return this.muted;
-  }
-
-  getCountryMusicTrack(countryId) {
-    return COUNTRY_MUSIC_TRACKS[countryId] || null;
-  }
-
-  startCountryMusic(countryId) {
-    const track = COUNTRY_MUSIC_TRACKS[countryId];
-    if (!track) {
-      throw new Error(`No hay música ambiental configurada para el destino "${countryId}".`);
-    }
-    if (this.countryMusicCountry === countryId && this.countryMusicAudio) {
-      if (this.countryMusicAudio.paused && !this.countryMusicPaused) {
-        this.playCountryTrack();
-      }
-      return;
-    }
-
-    this.stopCountryMusic();
-    const audio = new Audio();
-    audio.preload = 'none';
-    audio.loop = false;
-    audio.volume = this.muted ? 0 : 0.3;
-    audio.addEventListener('loadedmetadata', () => {
-      if (this.countryMusicAudio !== audio) return;
-      audio.currentTime = track.loopStart;
-    });
-    audio.addEventListener('seeked', () => {
-      if (this.countryMusicAudio !== audio) return;
-      if (!this.countryMusicReady) {
-        this.countryMusicReady = true;
-        this.playCountryTrack();
-      }
-    });
-    audio.addEventListener('timeupdate', () => {
-      if (this.countryMusicAudio === audio && audio.currentTime >= track.loopEnd) {
-        audio.currentTime = track.loopStart;
-      }
-    });
-    audio.addEventListener('error', () => {
-      if (this.countryMusicAudio !== audio) return;
-      window.dispatchEvent(new CustomEvent('country-music-error', { detail: { countryId } }));
-    });
-    audio.src = track.url;
-    this.countryMusicAudio = audio;
-    this.countryMusicCountry = countryId;
-    this.countryMusicPaused = false;
-    this.countryMusicReady = false;
-    audio.load();
-  }
-
-  updateCountryMusicVolume() {
-    if (!this.countryMusicAudio) return;
-    this.countryMusicAudio.volume = 0.3;
-    if (this.muted || this.countryMusicPaused) {
-      this.countryMusicAudio.pause();
-    } else {
-      this.playCountryTrack();
-    }
-  }
-
-  pauseCountryMusic(paused) {
-    this.countryMusicPaused = paused;
-    if (paused) {
-      this.countryMusicAudio?.pause();
-    } else {
-      this.playCountryTrack();
-    }
-  }
-
-  playCountryTrack() {
-    if (!this.countryMusicAudio || !this.countryMusicReady || this.muted || this.countryMusicPaused) return;
-    this.countryMusicAudio.play().catch(() => {
-      window.dispatchEvent(new CustomEvent('country-music-error', {
-        detail: { countryId: this.countryMusicCountry }
-      }));
-    });
-  }
-
-  stopCountryMusic() {
-    if (this.countryMusicAudio) {
-      this.countryMusicAudio.pause();
-      this.countryMusicAudio.removeAttribute('src');
-      this.countryMusicAudio.load();
-    }
-    this.countryMusicAudio = null;
-    this.countryMusicCountry = null;
-    this.countryMusicPaused = false;
-    this.countryMusicReady = false;
   }
 
   // Sonido de patada contundente al balón

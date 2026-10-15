@@ -260,20 +260,11 @@ class OnlineArena {
     if (this.user) {
       this.refs.profileAvatar.textContent = this.user.avatar;
       this.refs.profileNickname.textContent = this.user.nickname;
-      if (!isGuest) this.updateRankBadge(this.user);
     } else {
       this.refs.profileAvatar.textContent = '👤';
       this.refs.profileNickname.textContent = 'Entrar';
-      const rankValue = document.querySelector('.game-card__rank .game-card__stat-value');
-      const rankStatus = document.querySelector('.game-card__rank-status');
-      if (rankValue) rankValue.textContent = '—';
-      if (rankStatus) rankStatus.textContent = 'Crea una cuenta para competir';
     }
     if (isGuest) {
-      const rankValue = document.querySelector('.game-card__rank .game-card__stat-value');
-      const rankStatus = document.querySelector('.game-card__rank-status');
-      if (rankValue) rankValue.textContent = '—';
-      if (rankStatus) rankStatus.textContent = 'Invitado · sin puntos';
     }
     this.refs.guestPrompt?.classList.toggle('hidden', Boolean(this.user && !isGuest) || this.refs.rankedMatchBtn.disabled);
     if (this.refs.rankedActionType) this.refs.rankedActionType.textContent = this.user && !isGuest ? 'PARTIDA CLASIFICATORIA' : 'PARTIDA NORMAL';
@@ -332,13 +323,6 @@ class OnlineArena {
     } catch (error) {
       this.refs.goalkeeperSelectionStatus.textContent = error.message;
     }
-  }
-
-  updateRankBadge(user) {
-    const rankValue = document.querySelector('.game-card__rank .game-card__stat-value');
-    const rankStatus = document.querySelector('.game-card__rank-status');
-    if (rankValue) rankValue.textContent = `#${user.rank}`;
-    if (rankStatus) rankStatus.textContent = `${user.rating} puntos`;
   }
 
   setOnlineStatus(message, state = '') {
@@ -705,7 +689,6 @@ class OnlineArena {
     this.refs.onlineMatchResult.classList.add('hidden');
     this.refs.cancelOnlineBtn.classList.add('hidden');
     if (this.app.menuScreen) this.app.menuScreen.classList.add('hidden');
-    if (this.app.worldTourScreen) this.app.worldTourScreen.classList.add('hidden');
 
     this.updateScoreboard(message.scores, message.shots, false);
 

@@ -1,7 +1,7 @@
 {
-  "name": "Futbolín Kids Arena - Mini Juegos de Fútbol",
+  "name": "Futbolín Kids Arena - Penaltis Online",
   "short_name": "Futbolín Kids",
-  "description": "Plataforma de mini juegos de fútbol online gratis para niños. Juega a Penaltis Locos, Dominadas Infinitas y Super Portero desde tu móvil o tablet.",
+  "description": "Duelos de penaltis online 1 contra 1. Juega con rivales o invita a tus amigos.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

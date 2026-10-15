@@ -1,15 +1,12 @@
 /**
- * Futbolín Kids Arena - Minijuego individual: tanda de penaltis World Tour
- * Niveles progresivos en 5 países/ciudades icónicas:
- * Completa tandas en cinco ciudades y desbloquea el siguiente estadio.
+ * Futbolín Kids Arena - Motor de penaltis para duelos online.
  */
 
-const WORLD_TOUR_LEVELS = [
-  {
-    id: 'tokyo',
+const ARENA_LEVEL = {
+    id: 'arena',
     number: 1,
-    city: 'Tokio',
-    country: 'Japón',
+    city: 'Arena',
+    country: 'Mundial',
     flag: '🇯🇵',
     stadium: 'Estadio Nacional',
     landmark: '🗼',
@@ -28,106 +25,8 @@ const WORLD_TOUR_LEVELS = [
     diveSpeed: 5.2,
     reactionDelay: 0.12,
     guessRate: 0.35,
-    description: 'Empieza la gira en el Estadio Nacional de Tokio.'
-  },
-  {
-    id: 'rio',
-    number: 2,
-    city: 'Río de Janeiro',
-    country: 'Brasil',
-    flag: '🇧🇷',
-    stadium: 'Estadio Maracaná',
-    landmark: '⛰️',
-    keeperName: 'Portero de Río',
-    keeperType: 'salinas',
-    jerseyColor: ['#ca8a04', '#eab308'],
-    shortsColor: '#1d4ed8',
-    hasCap: false,
-    headbandColor: '#15803d',
-    hairColor: '#1c1917',
-    skinColor: '#d97706',
-    skyColors: ['#1e1b4b', '#7c2d12', '#ea580c'],
-    ledText: 'PENALTIS ★ RÍO DE JANEIRO ★ BRASIL',
-    targetScore: 3,
-    diveSpeed: 5.8,
-    reactionDelay: 0.09,
-    guessRate: 0.45,
-    description: 'Avanza hasta el Maracaná y demuestra tu puntería.'
-  },
-  {
-    id: 'munich',
-    number: 3,
-    city: 'Múnich',
-    country: 'Alemania',
-    flag: '🇩🇪',
-    stadium: 'Olympiastadion',
-    landmark: '🏰',
-    keeperName: 'Portero de Múnich',
-    keeperType: 'muller',
-    jerseyColor: ['#1e293b', '#334155'],
-    shortsColor: '#020617',
-    hasCap: false,
-    headbandColor: null,
-    hairColor: '#facc15',
-    skinColor: '#ffedd5',
-    skyColors: ['#020617', '#0f172a', '#1e3a8a'],
-    ledText: 'PENALTIS ★ MÚNICH ★ ALEMANIA',
-    targetScore: 4,
-    diveSpeed: 6.3,
-    reactionDelay: 0.07,
-    guessRate: 0.55,
-    description: 'Supera la tanda en el Olympiastadion de Múnich.'
-  },
-  {
-    id: 'milan',
-    number: 4,
-    city: 'Milán',
-    country: 'Italia',
-    flag: '🇮🇹',
-    stadium: 'San Siro',
-    landmark: '🏛️',
-    keeperName: 'Portero de Milán',
-    keeperType: 'gino',
-    jerseyColor: ['#0369a1', '#0284c7'],
-    shortsColor: '#ffffff',
-    hasCap: false,
-    headbandColor: null,
-    hairColor: '#451a03',
-    skinColor: '#fed7aa',
-    skyColors: ['#090d16', '#064e3b', '#047857'],
-    ledText: 'PENALTIS ★ MILÁN ★ ITALIA',
-    targetScore: 4,
-    diveSpeed: 6.7,
-    reactionDelay: 0.05,
-    guessRate: 0.65,
-    description: 'Llega a San Siro y afina tus lanzamientos.'
-  },
-  {
-    id: 'madrid',
-    number: 5,
-    city: 'Madrid',
-    country: 'España',
-    flag: '🇪🇸',
-    stadium: 'Gran Final Bernabéu',
-    landmark: '🏟️',
-    keeperName: 'Portero de Madrid',
-    keeperType: 'final',
-    jerseyColor: ['#b91c1c', '#dc2626'],
-    shortsColor: '#0f172a',
-    hasCap: true,
-    capColor: '#facc15',
-    capLogo: '★',
-    hairColor: '#020617',
-    skinColor: '#fed7aa',
-    skyColors: ['#1e1b4b', '#701a75', '#e11d48'],
-    ledText: 'PENALTIS ★ MADRID ★ GRAN FINAL',
-    targetScore: 4,
-    diveSpeed: 7.2,
-    reactionDelay: 0.04,
-    guessRate: 0.75,
-    description: 'Completa la gira con la tanda final en Madrid.'
-  }
-];
+    description: 'Duelo de penaltis online.'
+  };
 
 class PenaltisGame {
   constructor(canvas, app) {
@@ -146,7 +45,7 @@ class PenaltisGame {
       { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 255, icon: '↘️' }
     ];
 
-    this.currentLevel = WORLD_TOUR_LEVELS[0];
+    this.currentLevel = ARENA_LEVEL;
     this.isOnlineMode = false;
     this.onlineRole = null;
     this.onOnlineActionSubmit = null;
@@ -164,17 +63,6 @@ class PenaltisGame {
     };
 
     this.reset();
-  }
-
-  static get LEVELS() {
-    return WORLD_TOUR_LEVELS;
-  }
-
-  setLevel(levelId) {
-    const found = WORLD_TOUR_LEVELS.find(l => l.id === levelId);
-    if (found) {
-      this.currentLevel = found;
-    }
   }
 
   // --- MÉTODOS ONLINE ---
@@ -329,8 +217,7 @@ class PenaltisGame {
     this.timer = 0;
   }
 
-  start(levelId) {
-    if (!this.isOnlineMode && levelId) this.setLevel(levelId);
+  start() {
     this.reset();
     window.soundManager.playWhistle();
   }
@@ -970,26 +857,14 @@ class PenaltisGame {
 
   finishShootout() {
     this.state = 'round_over';
-    const goalsCount = this.history.filter(h => h === 'goal').length;
-    const currentIdx = WORLD_TOUR_LEVELS.findIndex(l => l.id === this.currentLevel.id);
-    const nextLevel = currentIdx < WORLD_TOUR_LEVELS.length - 1 ? WORLD_TOUR_LEVELS[currentIdx + 1] : null;
-
-    const result = window.storageManager.saveLevelResult(
-      this.currentLevel.id,
-      goalsCount,
-      this.currentLevel.targetScore,
-      nextLevel ? nextLevel.id : null
-    );
-
-    this.app.showWorldTourLevelResult({
-      level: this.currentLevel,
-      nextLevel: nextLevel,
-      goalsCount: goalsCount,
-      totalShots: this.maxShots,
-      passed: result.passed,
-      starsEarned: result.starsEarned,
-      unlockedNew: result.unlockedNew,
-      score: this.score
+    const goalsCount = this.history.filter(result => result === 'goal').length;
+    const isNewRecord = window.storageManager.setScore('penaltis', this.score, goalsCount);
+    this.app.showGameOver({
+      title: 'Tanda finalizada',
+      subtitle: `${goalsCount}/${this.maxShots} goles`,
+      score: this.score,
+      highScore: window.storageManager.getHighScore('penaltis'),
+      isNewRecord
     });
   }
 
