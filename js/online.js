@@ -2,6 +2,7 @@ class OnlineArena {
   constructor(app) {
     this.app = app;
     this.user = null;
+    this.guestSessionPromise = null;
     this.socket = null;
     this.socketPromise = null;
     this.useServerlessMatchApi = window.location.protocol === 'https:';
@@ -37,10 +38,14 @@ class OnlineArena {
       profileSubmitBtn: document.getElementById('profileSubmitBtn'),
       logoutBtn: document.getElementById('logoutBtn'),
       onlineStatus: document.getElementById('onlineStatus'),
+      guestPrompt: document.getElementById('guestPrompt'),
+      guestPromptText: document.getElementById('guestPromptText'),
+      guestRegisterBtn: document.getElementById('guestRegisterBtn'),
       matchmakingBanner: document.getElementById('matchmakingBanner'),
       goalkeeperRoster: document.getElementById('goalkeeperRoster'),
       goalkeeperSelectionStatus: document.getElementById('goalkeeperSelectionStatus'),
       rankedMatchBtn: document.getElementById('rankedMatchBtn'),
+      rankedActionType: document.getElementById('rankedActionType'),
       createFriendlyBtn: document.getElementById('createFriendlyBtn'),
       joinInviteForm: document.getElementById('joinInviteForm'),
       inviteCodeInput: document.getElementById('inviteCodeInput'),
@@ -87,6 +92,7 @@ class OnlineArena {
 
   bindEvents() {
     this.refs.profileButton.addEventListener('click', () => this.openProfile());
+    this.refs.guestRegisterBtn?.addEventListener('click', () => { this.openProfile(); this.setAuthMode('register'); });
     this.refs.goalkeeperRoster?.addEventListener('click', event => {
       const card = event.target.closest('[data-keeper-id]');
       if (card) this.selectGoalkeeper(card.dataset.keeperId);
@@ -160,10 +166,20 @@ class OnlineArena {
   async loadCurrentUser() {
     try {
       const { user } = await this.api('/api/me');
-      this.setUser(user);
+      if (user || !this.user) this.setUser(user);
       if (user && this.useServerlessMatchApi) await this.resumeServerlessMatch();
     } catch (error) {}
     await this.loadLeaderboard();
+  }
+
+  async ensureGuestSession() {
+    if (this.user) return this.user;
+    if (!this.guestSessionPromise) {
+      this.guestSessionPromise = this.api('/api/guest', { method: 'POST', body: '{}' })
+        .then(({ user }) => { this.setUser(user); return user; })
+        .finally(() => { this.guestSessionPromise = null; });
+    }
+    return this.guestSessionPromise;
   }
 
   async resumeServerlessMatch() {
@@ -179,6 +195,7 @@ class OnlineArena {
       this.setMatchmakingLoading(state.status === 'queued');
       this.refs.rankedMatchBtn.disabled = true;
       this.refs.createFriendlyBtn.disabled = true;
+      this.refs.guestPrompt?.classList.add('hidden');
       this.startMatchPolling(state.matchId || null);
     } catch (error) {}
   }
@@ -193,7 +210,7 @@ class OnlineArena {
       } else {
         topTen.forEach(entry => this.refs.leaderboardList.append(this.makeLeaderboardRow(entry)));
       }
-      if (this.user) this.updateRankBadge(this.user);
+      if (this.user && !this.user.isGuest) this.updateRankBadge(this.user);
     } catch {
       this.refs.leaderboardList.replaceChildren(this.makeLeaderboardMessage('No se pudo cargar el ranking. Inténtalo de nuevo más tarde.'));
     }
@@ -232,25 +249,40 @@ class OnlineArena {
   setUser(user) {
     const previousRating = this.user?.rating;
     this.user = user || null;
+    const isGuest = Boolean(this.user?.isGuest);
     const ratingCount = document.getElementById('headerRatingCount');
-    if (ratingCount) ratingCount.textContent = this.user ? this.user.rating.toLocaleString('es-ES') : '—';
+    if (ratingCount) ratingCount.textContent = this.user && !isGuest ? this.user.rating.toLocaleString('es-ES') : '—';
     ratingCount?.parentElement.classList.remove('is-up', 'is-down', 'is-updating');
-    if (ratingCount && previousRating !== undefined && this.user && previousRating !== this.user.rating) {
+    if (ratingCount && previousRating !== undefined && this.user && !isGuest && previousRating !== this.user.rating) {
       ratingCount.parentElement.classList.add(this.user.rating > previousRating ? 'is-up' : 'is-down', 'is-updating');
       window.setTimeout(() => ratingCount.parentElement.classList.remove('is-updating'), 850);
     }
     if (this.user) {
       this.refs.profileAvatar.textContent = this.user.avatar;
       this.refs.profileNickname.textContent = this.user.nickname;
-      this.updateRankBadge(this.user);
+      if (!isGuest) this.updateRankBadge(this.user);
     } else {
       this.refs.profileAvatar.textContent = '👤';
       this.refs.profileNickname.textContent = 'Entrar';
       const rankValue = document.querySelector('.game-card__rank .game-card__stat-value');
       const rankStatus = document.querySelector('.game-card__rank-status');
       if (rankValue) rankValue.textContent = '—';
-      if (rankStatus) rankStatus.textContent = 'Inicia sesión para competir';
+      if (rankStatus) rankStatus.textContent = 'Crea una cuenta para competir';
     }
+    if (isGuest) {
+      const rankValue = document.querySelector('.game-card__rank .game-card__stat-value');
+      const rankStatus = document.querySelector('.game-card__rank-status');
+      if (rankValue) rankValue.textContent = '—';
+      if (rankStatus) rankStatus.textContent = 'Invitado · sin puntos';
+    }
+    this.refs.guestPrompt?.classList.toggle('hidden', Boolean(this.user && !isGuest) || this.refs.rankedMatchBtn.disabled);
+    if (this.refs.rankedActionType) this.refs.rankedActionType.textContent = this.user && !isGuest ? 'PARTIDA CLASIFICATORIA' : 'PARTIDA NORMAL';
+    if (this.refs.guestPromptText) this.refs.guestPromptText.textContent = isGuest
+      ? `Estás jugando como ${this.user.nickname}. Crea una cuenta para ganar puntos y entrar en el ranking.`
+      : 'Juega ya sin cuenta. Si quieres competir por puntos y entrar en el ranking, crea tu perfil.';
+    if (!this.matchActive && !this.refs.rankedMatchBtn.disabled) this.setOnlineStatus(isGuest
+      ? `Juegas como ${this.user.nickname}. Tus partidas no suman puntos.`
+      : this.user ? 'Ya puedes buscar rival y competir por puntos.' : 'Puedes jugar como invitado. Crea una cuenta para sumar puntos.');
     this.renderGoalkeeperRoster();
     if (this.app.games?.penaltis) this.app.games.penaltis.setOnlineGoalkeeper(this.user?.keeperId || 'rookie');
   }
@@ -259,7 +291,7 @@ class OnlineArena {
     const host = this.refs.goalkeeperRoster;
     const library = window.GOALKEEPER_ROSTER;
     if (!host || !library) return;
-    const rating = Number(this.user?.rating) || 1000;
+    const rating = this.user?.isGuest ? 1000 : Number(this.user?.rating) || 1000;
     const equipped = this.user?.keeperId || 'rookie';
     host.replaceChildren();
     library.roster.forEach(keeper => {
@@ -272,7 +304,7 @@ class OnlineArena {
       card.dataset.rarity = keeper.unlockRating >= 2000 ? 'legendary' : keeper.unlockRating >= 1600 ? 'epic' : keeper.unlockRating >= 1200 ? 'rare' : 'starter';
       card.style.setProperty('--keeper-accent', keeper.colors[0]);
       card.style.setProperty('--keeper-trim', keeper.colors[2]);
-      card.disabled = !unlocked || selected || !this.user;
+      card.disabled = !unlocked || selected || !this.user || this.user.isGuest;
       card.setAttribute('aria-label', `${keeper.name}: ${unlocked ? (selected ? 'equipado' : 'seleccionar') : `se desbloquea con ${keeper.unlockRating} puntos`}`);
       const portrait = document.createElement('canvas');
       portrait.className = 'keeper-card__portrait';
@@ -285,13 +317,13 @@ class OnlineArena {
       info.append(name, title, badge); card.append(portrait, info); host.append(card);
       library.paintPortrait(portrait, keeper, selected);
     });
-    this.refs.goalkeeperSelectionStatus.textContent = !this.user
-      ? 'Inicia sesión para elegir y guardar tu portero'
+    this.refs.goalkeeperSelectionStatus.textContent = !this.user || this.user.isGuest
+      ? 'Crea una cuenta para elegir y desbloquear porteros'
       : `${rating.toLocaleString('es-ES')} pts · ${library.roster.filter(item => rating >= item.unlockRating).length}/${library.roster.length} desbloqueados`;
   }
 
   async selectGoalkeeper(id) {
-    if (!this.user) { this.openProfile(); return; }
+    if (!this.user || this.user.isGuest) { this.openProfile(); return; }
     this.refs.goalkeeperSelectionStatus.textContent = 'Guardando elección…';
     try {
       const { user } = await this.api('/api/goalkeeper', { method: 'PUT', body: JSON.stringify({ keeperId: id }) });
@@ -324,7 +356,7 @@ class OnlineArena {
     this.refs.profileForm.reset();
     this.refs.profileModal.classList.remove('hidden');
     this.refs.profileModal.classList.add('flex');
-    if (this.user) {
+    if (this.user && !this.user.isGuest) {
       this.authMode = 'profile';
       this.refs.profileTitle.textContent = 'Tu perfil de jugador';
       this.refs.authModeTabs.classList.add('hidden');
@@ -351,7 +383,7 @@ class OnlineArena {
   }
 
   setAuthMode(mode) {
-    if (this.user) return;
+    if (this.user && !this.user.isGuest) return;
     this.authMode = mode;
     const registering = mode === 'register';
     this.refs.authModeLogin.classList.toggle('is-active', !registering);
@@ -370,6 +402,11 @@ class OnlineArena {
   }
 
   async submitProfileForm() {
+    if (this.authMode !== 'profile' && (this.matchActive || this.refs.rankedMatchBtn.disabled)) {
+      this.refs.profileFormStatus.textContent = 'Termina o cancela la partida antes de cambiar de cuenta.';
+      this.refs.profileFormStatus.classList.add('is-error');
+      return;
+    }
     try {
       const nickname = this.refs.authNickname.value.trim();
       let payload;
@@ -380,6 +417,7 @@ class OnlineArena {
         if (this.authMode === 'register') body.avatar = this.selectedAvatar;
         payload = await this.api(`/api/${this.authMode}`, { method: 'POST', body: JSON.stringify(body) });
       }
+      if (this.authMode !== 'profile' && this.socket) { this.socket.close(); this.socket = null; }
       this.setUser(payload.user);
       this.closeProfile();
       await this.loadLeaderboard();
@@ -400,10 +438,7 @@ class OnlineArena {
   }
 
   async ensureSocket() {
-    if (!this.user) {
-      this.openProfile();
-      throw new Error('Inicia sesión para jugar online.');
-    }
+    await this.ensureGuestSession();
     if (this.socket && this.socket.readyState === WebSocket.OPEN) return this.socket;
     if (this.socketPromise) return this.socketPromise;
 
@@ -501,6 +536,7 @@ class OnlineArena {
     this.refs.cancelOnlineBtn.classList.add('hidden');
     this.refs.rankedMatchBtn.disabled = false;
     this.refs.createFriendlyBtn.disabled = false;
+    this.refs.guestPrompt?.classList.toggle('hidden', Boolean(this.user && !this.user.isGuest));
     this.refs.forfeitOnlineBtn.disabled = false;
   }
 
@@ -509,8 +545,10 @@ class OnlineArena {
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
+    this.refs.guestPrompt?.classList.add('hidden');
     this.setOnlineStatus('Buscando rival para el duelo…');
     try {
+      await this.ensureGuestSession();
       if (this.useServerlessMatchApi) {
         const result = await this.requestMatchApi({ action: 'queue' });
         if (result.matchId) this.startMatchPolling(result.matchId);
@@ -520,10 +558,7 @@ class OnlineArena {
       await this.ensureSocket();
       this.send({ type: 'queue-ranked' });
     } catch (error) {
-      this.setMatchmakingLoading(false);
-      this.refs.cancelOnlineBtn.classList.add('hidden');
-      this.refs.rankedMatchBtn.disabled = false;
-      this.refs.createFriendlyBtn.disabled = false;
+      this.resetOnlineControls();
       this.setOnlineStatus('No se pudo conectar con el servicio de partidas online.', 'error');
     }
   }
@@ -534,8 +569,10 @@ class OnlineArena {
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
+    this.refs.guestPrompt?.classList.add('hidden');
     this.setOnlineStatus('Preparando una invitación para tu amigo.');
     try {
+      await this.ensureGuestSession();
       if (this.useServerlessMatchApi) {
         const result = await this.requestMatchApi({ action: 'invite' });
         this.refs.inviteCode.textContent = result.code;
@@ -547,9 +584,7 @@ class OnlineArena {
       await this.ensureSocket();
       this.send({ type: 'create-invite' });
     } catch (error) {
-      this.refs.cancelOnlineBtn.classList.add('hidden');
-      this.refs.rankedMatchBtn.disabled = false;
-      this.refs.createFriendlyBtn.disabled = false;
+      this.resetOnlineControls();
       this.setOnlineStatus('No se pudo crear la invitación.', 'error');
     }
   }
@@ -561,8 +596,10 @@ class OnlineArena {
     this.refs.cancelOnlineBtn.classList.remove('hidden');
     this.refs.rankedMatchBtn.disabled = true;
     this.refs.createFriendlyBtn.disabled = true;
+    this.refs.guestPrompt?.classList.add('hidden');
     this.setOnlineStatus('Conectando con la partida…');
     try {
+      await this.ensureGuestSession();
       if (this.useServerlessMatchApi) {
         const result = await this.requestMatchApi({ action: 'join-invite', code });
         this.currentMode = 'friendly';
@@ -572,9 +609,7 @@ class OnlineArena {
       await this.ensureSocket();
       this.send({ type: 'join-invite', code });
     } catch (error) {
-      this.refs.cancelOnlineBtn.classList.add('hidden');
-      this.refs.rankedMatchBtn.disabled = false;
-      this.refs.createFriendlyBtn.disabled = false;
+      this.resetOnlineControls();
       this.setOnlineStatus('No se pudo conectar con la partida.', 'error');
     }
   }
@@ -617,18 +652,12 @@ class OnlineArena {
         this.setOnlineStatus('Rival encontrado. Preparando el duelo…', 'success');
         break;
       case 'cancelled':
-        this.setMatchmakingLoading(false);
-        this.refs.cancelOnlineBtn.classList.add('hidden');
-        this.refs.rankedMatchBtn.disabled = false;
-        this.refs.createFriendlyBtn.disabled = false;
+        this.resetOnlineControls();
         this.refs.invitePanel.classList.add('hidden');
         this.setOnlineStatus('Búsqueda cancelada. Puedes volver a buscar rival.');
         break;
       case 'error':
-        this.setMatchmakingLoading(false);
-        this.refs.cancelOnlineBtn.classList.add('hidden');
-        this.refs.rankedMatchBtn.disabled = false;
-        this.refs.createFriendlyBtn.disabled = false;
+        this.resetOnlineControls();
         this.setOnlineStatus(message.message || 'No se pudo completar la acción.', 'error');
         break;
       case 'match-start':
@@ -656,18 +685,18 @@ class OnlineArena {
     this.playerIndex = message.playerIndex;
     this.matchActive = true;
     this.actionSubmitted = false;
-    this.refs.onlineMatchMode.textContent = message.mode === 'friendly' ? 'AMISTOSA' : 'CLASIFICATORIA';
-
     const you = message.you || this.user || {};
     const opponent = message.opponent || {};
+    const isNormal = message.mode === 'ranked' && (you.isGuest || opponent.isGuest);
+    this.refs.onlineMatchMode.textContent = message.mode === 'friendly' ? 'AMISTOSA' : isNormal ? 'PARTIDA NORMAL' : 'CLASIFICATORIA';
     this.youKeeperId = you.keeperId || this.user?.keeperId || 'rookie';
     this.opponentKeeperId = opponent.keeperId || 'rookie';
     this.refs.onlineYouAvatar.textContent = you.avatar || '⚽';
     this.refs.onlineYouName.textContent = you.nickname || 'Tú';
-    this.refs.onlineYouMeta.textContent = `${you.rating ?? 1000} pts`;
+    this.refs.onlineYouMeta.textContent = isNormal ? 'SIN PUNTOS' : you.isGuest ? 'INVITADO' : `${you.rating ?? 1000} pts`;
     this.refs.onlineOpponentAvatar.textContent = opponent.avatar || '⚽';
     this.refs.onlineOpponentName.textContent = opponent.nickname || 'Rival';
-    this.refs.onlineOpponentMeta.textContent = `${opponent.rating ?? 1000} pts`;
+    this.refs.onlineOpponentMeta.textContent = isNormal ? 'SIN PUNTOS' : opponent.isGuest ? 'INVITADO' : `${opponent.rating ?? 1000} pts`;
 
     if (this.app.gameScreen) this.app.gameScreen.classList.remove('hidden');
     if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.add('hidden');
@@ -838,7 +867,8 @@ class OnlineArena {
     const rating = message.rating || {};
     const delta = Number(rating.delta) || 0;
     const updatedUser = message.user || this.user;
-    const ranked = message.mode === 'ranked';
+    const ranked = message.mode === 'ranked' && !updatedUser?.isGuest && !opponent.isGuest;
+    const normal = message.mode === 'ranked' && !ranked;
 
     if (updatedUser) this.setUser(updatedUser);
     this.app.gameState = 'online-result';
@@ -848,7 +878,7 @@ class OnlineArena {
     this.refs.onlineMatchScreen.classList.remove('hidden');
     this.refs.forfeitOnlineBtn.classList.add('hidden');
 
-    this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : 'PARTIDA AMISTOSA';
+    this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : normal ? 'PARTIDA NORMAL' : 'PARTIDA AMISTOSA';
     this.refs.onlineResultIcon.textContent = won ? '🏆' : draw ? '🤝' : '⚡';
     this.refs.onlineResultTitle.textContent = won ? '¡Victoria!' : draw ? 'Empate' : 'Derrota';
     let reason = '';
@@ -862,7 +892,7 @@ class OnlineArena {
 
     this.refs.onlineRatingChange.classList.remove('is-up', 'is-down');
     if (!ranked) {
-      this.refs.onlineRatingChange.textContent = 'AMISTOSA · SIN CAMBIO DE PUNTOS';
+      this.refs.onlineRatingChange.textContent = normal ? 'PARTIDA NORMAL · SIN CAMBIO DE PUNTOS' : 'AMISTOSA · SIN CAMBIO DE PUNTOS';
     } else if (delta > 0) {
       this.refs.onlineRatingChange.textContent = `+${delta} PTS · TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
       this.refs.onlineRatingChange.classList.add('is-up');
@@ -875,7 +905,8 @@ class OnlineArena {
 
     const record = updatedUser ? `${updatedUser.wins ?? 0} victorias · ${updatedUser.losses ?? 0} derrotas` : '';
     const rank = updatedUser?.rank ? ` · puesto #${updatedUser.rank}` : '';
-    this.refs.onlineResultRecord.textContent = ranked ? `${record}${rank}` : 'Las amistosas no alteran el ranking';
+    this.refs.onlineResultRecord.textContent = ranked ? `${record}${rank}` : updatedUser?.isGuest
+      ? 'Crea una cuenta para competir en el ranking' : 'Esta partida no altera el ranking';
     this.loadLeaderboard();
   }
 

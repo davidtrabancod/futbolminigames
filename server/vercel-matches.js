@@ -91,6 +91,7 @@ async function ensureSchema(sql) {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT FALSE`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_guest BOOLEAN NOT NULL DEFAULT FALSE`;
       const botSalt = crypto.randomBytes(16).toString('hex');
       const botHash = crypto.randomBytes(48).toString('hex');
       const schemaNow = Date.now();
@@ -122,13 +123,14 @@ async function ensureSchema(sql) {
         LANGUAGE SQL STABLE AS $function$
           SELECT jsonb_build_object(
             'id', u.id, 'nickname', u.nickname, 'avatar', u.avatar, 'keeperId', u.keeper_id,
-            'rating', u.rating, 'rank', (
+            'rating', u.rating, 'rank', (CASE WHEN u.is_guest THEN NULL ELSE (
               SELECT COUNT(*)::INTEGER + 1 FROM users better
-              WHERE better.is_bot = FALSE AND (better.rating > u.rating
+              WHERE better.is_bot = FALSE AND better.is_guest = FALSE AND (better.rating > u.rating
                  OR (better.rating = u.rating AND better.wins > u.wins)
                  OR (better.rating = u.rating AND better.wins = u.wins AND better.nickname_key < u.nickname_key))
-            ),
-            'wins', u.wins, 'losses', u.losses, 'matches', u.matches, 'winStreak', u.win_streak
+            ) END),
+            'wins', u.wins, 'losses', u.losses, 'matches', u.matches, 'winStreak', u.win_streak,
+            'isGuest', u.is_guest
           ) FROM users u WHERE u.id = p_user_id
         $function$`;
 
@@ -152,7 +154,8 @@ async function ensureSchema(sql) {
               'type', 'match-start', 'matchId', p_match_id, 'mode', m.mode, 'playerIndex', i,
               'you', arena_public_user(me_id), 'opponent', arena_public_user(other_id),
               'scores', to_jsonb(m.scores), 'shots', to_jsonb(m.shots),
-              'regulationShots', 3, 'ratingPoints', CASE WHEN m.mode = 'ranked'
+              'regulationShots', 3, 'ratingPoints', CASE WHEN m.mode = 'ranked' AND NOT EXISTS
+                (SELECT 1 FROM users participant WHERE participant.id IN (m.player_one, m.player_two) AND participant.is_guest)
                 THEN 24 + LEAST(COALESCE((SELECT win_streak FROM users WHERE id = me_id), 0) * 2, 12)
                 ELSE 0 END
             ), (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT);
@@ -202,8 +205,11 @@ async function ensureSchema(sql) {
             ORDER BY created_at DESC LIMIT 1;
           IF existing_match IS NOT NULL THEN RETURN jsonb_build_object('status', 'in-match', 'matchId', existing_match); END IF;
           DELETE FROM online_queue WHERE created_at < (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT - 600000;
-          SELECT user_id INTO candidate_id FROM online_queue
-            WHERE user_id <> p_user_id ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1;
+          SELECT q.user_id INTO candidate_id FROM online_queue q
+            JOIN users candidate ON candidate.id = q.user_id
+            WHERE q.user_id <> p_user_id
+              AND candidate.is_guest = (SELECT requester.is_guest FROM users requester WHERE requester.id = p_user_id)
+            ORDER BY q.created_at FOR UPDATE OF q SKIP LOCKED LIMIT 1;
           IF candidate_id IS NULL THEN
             INSERT INTO online_queue(user_id, created_at)
               VALUES (p_user_id, (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT)
@@ -259,7 +265,8 @@ async function ensureSchema(sql) {
             user_id := ids[i];
             SELECT * INTO user_row FROM users WHERE id = user_id FOR UPDATE;
             before_ratings[i] := user_row.rating;
-            IF m.mode = 'ranked' AND p_winner_index IS NOT NULL THEN
+            IF m.mode = 'ranked' AND p_winner_index IS NOT NULL AND NOT EXISTS
+              (SELECT 1 FROM users participant WHERE participant.id IN (m.player_one, m.player_two) AND participant.is_guest) THEN
               new_streak := CASE WHEN p_winner_index = i - 1 THEN user_row.win_streak + 1 ELSE 0 END;
               point_gain := CASE WHEN p_winner_index = i - 1 THEN 24 + LEAST((new_streak - 1) * 2, 12) ELSE -24 END;
               after_ratings[i] := GREATEST(0, user_row.rating + point_gain);

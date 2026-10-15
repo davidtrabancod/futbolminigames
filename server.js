@@ -185,7 +185,7 @@ function removeInviteFor(ws) {
 }
 
 function userForMatch(user) {
-  return { id: user.id, nickname: user.nickname, avatar: user.avatar, keeperId: user.keeperId || 'rookie', rating: user.rating, rank: user.rank, wins: user.wins, matches: user.matches };
+  return { id: user.id, nickname: user.nickname, avatar: user.avatar, keeperId: user.keeperId || user.keeper_id || 'rookie', rating: user.rating, rank: user.rank, wins: user.wins, matches: user.matches, isGuest: Boolean(user.is_guest || user.isGuest) };
 }
 
 function createMatch({ players, mode, botIndex = null }) {
@@ -228,7 +228,7 @@ function publishMatchStart(match) {
       shots: match.shots,
       scores: match.scores,
       regulationShots: REGULATION_SHOTS,
-      ratingPoints: match.mode === 'ranked' ? RATING_POINTS : 0,
+      ratingPoints: match.mode === 'ranked' && !match.players.some(player => player.is_guest) ? RATING_POINTS : 0,
       suddenDeath: false
     });
   });
@@ -409,7 +409,7 @@ function handleSocketMessage(ws, rawData) {
 
   if (message.type === 'queue-ranked') {
     if (ws.matchId || ws.queueState) return;
-    const waiting = queue.findIndex(entry => entry.ws !== ws);
+    const waiting = queue.findIndex(entry => entry.ws !== ws && Boolean(entry.ws.arenaUser.is_guest) === Boolean(ws.arenaUser.is_guest));
     if (waiting >= 0) {
       const opponent = queue.splice(waiting, 1)[0];
       clearTimeout(opponent.timer);
@@ -508,13 +508,21 @@ async function handleApi(req, res, url) {
   const pathname = url.pathname;
 
   if (method === 'GET' && pathname === '/api/me') {
-    return sendJson(res, 200, { user });
+    return sendJson(res, 200, { user: user ? database.publicUser(user) : null });
   }
   if (method === 'GET' && pathname === '/api/leaderboard') {
     return sendJson(res, 200, { entries: database.leaderboard(50) });
   }
 
   if (['POST', 'PUT', 'DELETE'].includes(method)) checkSameOrigin(req);
+
+  if (method === 'POST' && pathname === '/api/guest') {
+    if (user) return sendJson(res, 200, { user: database.publicUser(user) });
+    consumeAuthAttempt(req);
+    const guest = database.createGuest();
+    const token = database.createSession(guest.id);
+    return sendJson(res, 201, { user: database.publicUser(guest) }, { 'Set-Cookie': sessionCookie(token, secure) });
+  }
 
   if (method === 'POST' && pathname === '/api/register') {
     consumeAuthAttempt(req);
@@ -535,13 +543,13 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { user: null }, { 'Set-Cookie': clearSessionCookie(secure) });
   }
   if (method === 'PUT' && pathname === '/api/profile') {
-    if (!user) return sendJson(res, 401, { error: 'Inicia sesión para editar tu perfil.' });
+    if (!user || user.is_guest) return sendJson(res, 401, { error: 'Crea una cuenta para editar tu perfil.' });
     const body = await readJsonBody(req);
     const updated = database.updateProfile(user.id, body);
     return sendJson(res, 200, { user: database.publicUser(updated) });
   }
   if (method === 'PUT' && pathname === '/api/goalkeeper') {
-    if (!user) return sendJson(res, 401, { error: 'Inicia sesión para elegir tu portero.' });
+    if (!user || user.is_guest) return sendJson(res, 401, { error: 'Crea una cuenta para elegir tu portero.' });
     const body = await readJsonBody(req);
     const updated = database.updateGoalkeeper(user.id, body.keeperId);
     return sendJson(res, 200, { user: database.publicUser(updated) });
@@ -620,7 +628,7 @@ server.on('upgrade', (req, socket, head) => {
         oldSocket.close(4001, 'Replaced by a new connection');
       }
       clientsByUser.set(user.id, ws);
-      sendSocket(ws, { type: 'connected', user });
+      sendSocket(ws, { type: 'connected', user: database.publicUser(user) });
       ws.on('message', data => handleSocketMessage(ws, data));
       ws.on('error', error => console.error('Error de WebSocket:', error.message));
       ws.on('close', () => {

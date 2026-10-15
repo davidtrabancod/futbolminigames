@@ -261,7 +261,7 @@
         <div class="online-hub__heading">
           <span class="online-hub__eyebrow">COMPITE EN TODO EL MUNDO · 1 VS 1</span>
           <h2 id="onlineHubTitle">¿Listo para el duelo?</h2>
-          <p>Busca rival o invita a un amigo. Cada partido clasificatorio cuenta para el ranking mundial.</p>
+          <p>Busca rival o invita a un amigo. Con una cuenta podrás competir por puntos en el ranking mundial.</p>
         </div>
 
         <div class="online-hub__layout">
@@ -280,7 +280,7 @@
             <div class="online-hub__actions">
               <button id="rankedMatchBtn" class="btn-arcade btn-arcade-green online-action online-action--ranked" type="button">
                 <span class="online-action__icon" aria-hidden="true">⌖</span>
-                <span class="online-action__copy"><small>PARTIDA CLASIFICATORIA</small><strong>BUSCAR RIVAL</strong></span>
+                <span class="online-action__copy"><small id="rankedActionType">PARTIDA NORMAL</small><strong>BUSCAR RIVAL</strong></span>
                 <span class="online-action__arrow" aria-hidden="true">↗</span>
               </button>
               <button id="createFriendlyBtn" class="btn-arcade btn-arcade-blue online-action online-action--friendly" type="button">
@@ -299,7 +299,11 @@
               </div>
             </div>
             <div id="onlineStatus" class="online-status" role="status" aria-live="polite">
-              Inicia sesión para jugar y guardar tus puntos.
+              Puedes jugar como invitado. Crea una cuenta para sumar puntos.
+            </div>
+            <div id="guestPrompt" class="guest-prompt">
+              <span id="guestPromptText">Juega ya sin cuenta. Si quieres competir por puntos y entrar en el ranking, crea tu perfil.</span>
+              <button id="guestRegisterBtn" type="button">CREAR CUENTA <span aria-hidden="true">↗</span></button>
             </div>
             <button id="cancelOnlineBtn" class="online-text-button hidden" type="button">Cancelar búsqueda</button>
 
@@ -323,7 +327,7 @@
           <section class="keeper-select" aria-labelledby="keeperSelectTitle">
             <div class="keeper-select__heading">
               <div><span class="online-hub__eyebrow">TU ESTILO BAJO PALOS</span><h4 id="keeperSelectTitle">Elige tu portero</h4></div>
-              <span id="goalkeeperSelectionStatus" class="keeper-select__status" aria-live="polite">Inicia sesión para guardar tu elección</span>
+              <span id="goalkeeperSelectionStatus" class="keeper-select__status" aria-live="polite">Crea una cuenta para elegir y desbloquear porteros</span>
             </div>
             <div id="goalkeeperRoster" class="keeper-roster" aria-label="Porteros desbloqueables"></div>
           </section>
@@ -402,7 +406,7 @@
                 <div class="game-card__rank game-card__stat" aria-label="Tu puesto en el ranking online">
                   <span class="game-card__stat-label">🌐 Tu puesto online</span>
                   <span class="game-card__stat-value">—</span>
-                  <span class="game-card__rank-status">Inicia sesión para competir</span>
+                  <span class="game-card__rank-status">Crea una cuenta para competir</span>
                 </div>
               </div>
               <button class="btn-arcade btn-arcade-green w-full py-3 text-base sm:text-lg mt-2 pointer-events-none">

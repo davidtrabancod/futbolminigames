@@ -33,6 +33,7 @@ class ArenaDatabase {
         matches INTEGER NOT NULL DEFAULT 0,
         win_streak INTEGER NOT NULL DEFAULT 0,
         keeper_id TEXT NOT NULL DEFAULT 'rookie',
+        is_guest INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
@@ -66,6 +67,9 @@ class ArenaDatabase {
     if (!userColumns.some(column => column.name === 'win_streak')) {
       this.db.exec('ALTER TABLE users ADD COLUMN win_streak INTEGER NOT NULL DEFAULT 0');
     }
+    if (!userColumns.some(column => column.name === 'is_guest')) {
+      this.db.exec('ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0');
+    }
     this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
   }
 
@@ -92,12 +96,12 @@ class ArenaDatabase {
   }
 
   publicUser(row) {
-    const rank = this.db.prepare(`
+    const rank = row.is_guest ? null : this.db.prepare(`
       SELECT COUNT(*) + 1 AS rank
       FROM users
-      WHERE rating > ?
+      WHERE is_guest = 0 AND (rating > ?
          OR (rating = ? AND wins > ?)
-         OR (rating = ? AND wins = ? AND nickname_key < ?)
+         OR (rating = ? AND wins = ? AND nickname_key < ?))
     `).get(row.rating, row.rating, row.wins, row.rating, row.wins, row.nickname_key).rank;
     return {
       id: row.id,
@@ -109,7 +113,8 @@ class ArenaDatabase {
       wins: row.wins,
       losses: row.losses,
       matches: row.matches,
-      winStreak: row.win_streak || 0
+      winStreak: row.win_streak || 0,
+      isGuest: Boolean(row.is_guest)
     };
   }
 
@@ -137,12 +142,29 @@ class ArenaDatabase {
     }
   }
 
+  createGuest() {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const nickname = `Invitado_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      const now = Date.now();
+      try {
+        const result = this.db.prepare(`INSERT INTO users
+          (nickname, nickname_key, avatar, password_salt, password_hash, is_guest, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 1, ?, ?)`)
+          .run(nickname, nickname.toLowerCase(), '⚽', crypto.randomBytes(16).toString('hex'), crypto.randomBytes(64).toString('hex'), now, now);
+        return this.getUserById(Number(result.lastInsertRowid));
+      } catch (error) {
+        if (error.code !== 'ERR_SQLITE_ERROR' || error.errcode !== 2067) throw error;
+      }
+    }
+    throw inputError('No se pudo crear el invitado. Inténtalo de nuevo.');
+  }
+
   authenticate({ nickname: rawNickname, password: rawPassword }) {
     if (typeof rawNickname !== 'string' || typeof rawPassword !== 'string') {
       throw inputError('Nickname o contraseña incorrectos.');
     }
     const key = rawNickname.normalize('NFKC').trim().toLocaleLowerCase('und');
-    const row = this.db.prepare('SELECT * FROM users WHERE nickname_key = ?').get(key);
+    const row = this.db.prepare('SELECT * FROM users WHERE nickname_key = ? AND is_guest = 0').get(key);
     if (!row || rawPassword.length > 128) throw inputError('Nickname o contraseña incorrectos.');
     const supplied = crypto.scryptSync(rawPassword, row.password_salt, PASSWORD_BYTES);
     const stored = Buffer.from(row.password_hash, 'hex');
@@ -203,7 +225,7 @@ class ArenaDatabase {
 
   leaderboard(limit = 50) {
     return this.db.prepare(`
-      SELECT users.* FROM users
+      SELECT users.* FROM users WHERE is_guest = 0
       ORDER BY rating DESC, wins DESC, nickname_key ASC
       LIMIT ?
     `).all(limit).map((row, index) => ({
@@ -217,7 +239,7 @@ class ArenaDatabase {
   }
 
   saveMatch({ id, mode, players, scores, winnerIndex, botIndex = null, suddenDeath }) {
-    const rated = mode === 'ranked';
+    const rated = mode === 'ranked' && players.every((player, index) => index === botIndex || !player.is_guest);
     const playerOne = players[0].id;
     const playerTwo = botIndex === 1 ? null : players[1].id;
     let ratingResults = players.map(player => ({

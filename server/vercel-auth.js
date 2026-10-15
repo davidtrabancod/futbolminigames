@@ -43,6 +43,7 @@ async function ensureSchema(sql) {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT FALSE`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_guest BOOLEAN NOT NULL DEFAULT FALSE`;
       await sql`CREATE INDEX IF NOT EXISTS sessions_user_id ON sessions(user_id)`;
       await sql`CREATE INDEX IF NOT EXISTS users_leaderboard ON users(rating DESC, wins DESC, nickname_key ASC)`;
       await sql`CREATE TABLE IF NOT EXISTS auth_attempts (
@@ -94,18 +95,20 @@ function publicUser(row, rank) {
     wins: row.wins,
     losses: row.losses,
     matches: row.matches,
-    winStreak: row.win_streak || 0
+    winStreak: row.win_streak || 0,
+    isGuest: Boolean(row.is_guest)
   };
 }
 
 async function getPublicUser(sql, row) {
   if (!row) return null;
+  if (row.is_guest) return publicUser(row, null);
   const [result] = await sql`
     SELECT COUNT(*)::INTEGER + 1 AS rank
     FROM users
-    WHERE rating > ${row.rating}
+    WHERE is_bot = FALSE AND is_guest = FALSE AND (rating > ${row.rating}
        OR (rating = ${row.rating} AND wins > ${row.wins})
-       OR (rating = ${row.rating} AND wins = ${row.wins} AND nickname_key < ${row.nickname_key})
+       OR (rating = ${row.rating} AND wins = ${row.wins} AND nickname_key < ${row.nickname_key}))
   `;
   return publicUser(row, result.rank);
 }
@@ -222,7 +225,7 @@ async function authenticate(sql, body) {
   if (typeof body.nickname !== 'string' || typeof body.password !== 'string') {
     throw appError('Nickname o contraseña incorrectos.');
   }
-  const [row] = await sql`SELECT * FROM users WHERE nickname_key = ${nicknameKey(body.nickname)}`;
+  const [row] = await sql`SELECT * FROM users WHERE nickname_key = ${nicknameKey(body.nickname)} AND is_guest = FALSE AND is_bot = FALSE`;
   if (!row || body.password.length > 128) throw appError('Nickname o contraseña incorrectos.');
   const supplied = crypto.scryptSync(body.password, row.password_salt, PASSWORD_BYTES);
   const stored = Buffer.from(row.password_hash, 'hex');
@@ -274,7 +277,7 @@ function createHandler(endpoint) {
       if (endpoint === 'leaderboard' && method === 'GET') {
         const entries = await sql`SELECT ROW_NUMBER() OVER (ORDER BY rating DESC, wins DESC, nickname_key ASC)::INTEGER AS rank,
           nickname, avatar, rating, wins, matches FROM users
-          WHERE is_bot = FALSE ORDER BY rating DESC, wins DESC, nickname_key ASC LIMIT 50`;
+          WHERE is_bot = FALSE AND is_guest = FALSE ORDER BY rating DESC, wins DESC, nickname_key ASC LIMIT 50`;
         return setJson(res, 200, { entries });
       }
 
@@ -283,6 +286,26 @@ function createHandler(endpoint) {
         const user = await createUser(sql, await readBody(req));
         const session = await createSession(sql, user.id);
         return setJson(res, 201, { user: await getPublicUser(sql, user) }, { 'Set-Cookie': sessionCookie(session, secure) });
+      }
+
+      if (endpoint === 'guest' && method === 'POST') {
+        const existing = await userFromSession(sql, token);
+        if (existing) return setJson(res, 200, { user: await getPublicUser(sql, existing) });
+        await consumeAuthAttempt(sql, req);
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const nickname = `Invitado_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+          const now = Date.now();
+          try {
+            const [guest] = await sql`INSERT INTO users
+              (nickname, nickname_key, avatar, password_salt, password_hash, is_guest, created_at, updated_at)
+              VALUES (${nickname}, ${nickname.toLowerCase()}, '⚽', ${crypto.randomBytes(16).toString('hex')}, ${crypto.randomBytes(64).toString('hex')}, TRUE, ${now}, ${now}) RETURNING *`;
+            const session = await createSession(sql, guest.id);
+            return setJson(res, 201, { user: await getPublicUser(sql, guest) }, { 'Set-Cookie': sessionCookie(session, secure) });
+          } catch (error) {
+            if (error.code !== '23505') throw error;
+          }
+        }
+        throw appError('No se pudo crear el invitado. Inténtalo de nuevo.', 503);
       }
 
       if (endpoint === 'login' && method === 'POST') {
@@ -299,14 +322,14 @@ function createHandler(endpoint) {
 
       if (endpoint === 'profile' && method === 'PUT') {
         const user = await userFromSession(sql, token);
-        if (!user) throw appError('Inicia sesión para editar tu perfil.', 401);
+        if (!user || user.is_guest) throw appError('Crea una cuenta para editar tu perfil.', 401);
         const updated = await updateProfile(sql, user.id, await readBody(req));
         return setJson(res, 200, { user: await getPublicUser(sql, updated) });
       }
 
       if (endpoint === 'goalkeeper' && method === 'PUT') {
         const user = await userFromSession(sql, token);
-        if (!user) throw appError('Inicia sesión para elegir tu portero.', 401);
+        if (!user || user.is_guest) throw appError('Crea una cuenta para elegir tu portero.', 401);
         const updated = await updateGoalkeeper(sql, user.id, await readBody(req));
         return setJson(res, 200, { user: await getPublicUser(sql, updated) });
       }
