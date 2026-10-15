@@ -69,6 +69,8 @@ class PenaltisGame {
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
     this.arenaBackground.src = './assets/penalty-stadium-perspective.png';
+    this.fireSprite = new Image();
+    this.fireSprite.src = './assets/brazier-flame-sprite.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
       x: 20 + Math.random() * 920,
       y: 105 + Math.random() * 180,
@@ -590,16 +592,16 @@ class PenaltisGame {
   update(dt) {
     this.timer += dt;
 
-    if (Math.random() < dt * 24 && this.fireEmbers.length < 90) {
+    if (Math.random() < dt * 7 && this.fireEmbers.length < 24) {
       const side = Math.random() < .5 ? 1 : -1;
-      const sourceX = side > 0 ? 930 : 30;
+      const sourceX = side > 0 ? 940 : 20;
       this.fireEmbers.push({
-        x: sourceX + (Math.random() - .5) * 16,
-        y: 254 + Math.random() * 10,
+        x: sourceX + (Math.random() - .5) * 5,
+        y: 276 + Math.random() * 5,
         vx: -side * (3 + Math.random() * 14) + (Math.random() - .5) * 7,
-        vy: -(34 + Math.random() * 58),
-        size: .8 + Math.random() * 2.4,
-        life: .6 + Math.random() * .9,
+        vy: -(20 + Math.random() * 33),
+        size: .45 + Math.random() * 1.15,
+        life: .45 + Math.random() * .65,
         age: 0,
         hue: Math.random() < .5 ? 24 : 42
       });
@@ -1152,40 +1154,46 @@ class PenaltisGame {
 
   renderFireEffects(ctx) {
     ctx.save();
-    ctx.globalCompositeOperation = 'screen';
     const height = this.app.virtualHeight;
-    for (const [index, sourceX] of [30, this.app.virtualWidth - 30].entries()) {
-      const phase = this.timer * 5.8 + sourceX;
-      const baseY = height * .423;
-      const flicker = .78 + Math.sin(phase) * .12 + Math.sin(phase * 2.7) * .1;
-      const torchX = index === 0 ? sourceX + 7 : sourceX - 7;
-      const glow = ctx.createRadialGradient(torchX, baseY - 8, 2, torchX, baseY, 66);
-      glow.addColorStop(0, `rgba(255,178,70,${.46 * flicker})`);
-      glow.addColorStop(.34, `rgba(255,82,22,${.19 * flicker})`);
-      glow.addColorStop(1, 'rgba(255,55,15,0)');
+    const torches = [
+      { x: 20, y: height * .46, direction: 1 },
+      { x: this.app.virtualWidth - 20, y: height * .46, direction: -1 }
+    ];
+    for (const [index, torch] of torches.entries()) {
+      const phase = this.timer * 6.2 + index * 2.4;
+      const flicker = Math.sin(phase) * .045 + Math.sin(phase * 2.17) * .025;
+      const { x: baseX, y: baseY, direction } = torch;
+
+      // Small localized bounce light anchors the photographed flame to the brazier bowl.
+      const glow = ctx.createRadialGradient(baseX, baseY - 4, 1, baseX, baseY - 4, 25);
+      glow.addColorStop(0, `rgba(255,158,48,${.19 + flicker})`);
+      glow.addColorStop(.4, `rgba(255,94,24,${.08 + flicker * .4})`);
+      glow.addColorStop(1, 'rgba(255,65,14,0)');
       ctx.fillStyle = glow;
-      ctx.fillRect(torchX - 72, baseY - 78, 144, 118);
-      ctx.globalCompositeOperation = 'lighter';
-      for (let tongue = 0; tongue < 7; tongue++) {
-        const phaseTongue = phase + tongue * 1.53;
-        const x = torchX + Math.sin(phaseTongue * .73) * (5 + tongue * .8);
-        const flameHeight = (42 + (Math.sin(phaseTongue) + 1) * 21) * flicker;
-        const tongueWidth = 4 + (Math.cos(phaseTongue * .8) + 1) * 3.2;
-        const lean = Math.sin(phaseTongue * .45) * 6;
-        const flame = ctx.createLinearGradient(x, baseY, x + lean, baseY - flameHeight);
-        flame.addColorStop(0, 'rgba(255,53,8,.12)');
-        flame.addColorStop(.3, 'rgba(255,83,14,.88)');
-        flame.addColorStop(.68, 'rgba(255,154,35,.97)');
-        flame.addColorStop(.9, 'rgba(255,224,115,.9)');
-        flame.addColorStop(1, 'rgba(255,249,202,.02)');
-        ctx.fillStyle = flame;
+      ctx.fillRect(baseX - 28, baseY - 30, 56, 34);
+
+      if (this.fireSprite?.complete && this.fireSprite.naturalWidth > 0) {
+        const sway = Math.sin(phase * .48) * .035 + direction * .018;
+        const width = 36 * (1 + flicker * .65);
+        const flameHeight = 56 * (1 + Math.sin(phase * .83) * .055);
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = .92;
+        ctx.translate(baseX, baseY);
+        ctx.rotate(sway);
+        ctx.drawImage(this.fireSprite, -width / 2, -flameHeight, width, flameHeight);
+        ctx.restore();
+      } else {
+        // Short loading fallback; the transparent photographic sprite replaces it on load.
+        const fallback = ctx.createLinearGradient(baseX, baseY, baseX, baseY - 28);
+        fallback.addColorStop(0, 'rgba(255,93,22,.75)');
+        fallback.addColorStop(.65, 'rgba(255,179,54,.84)');
+        fallback.addColorStop(1, 'rgba(255,229,151,0)');
+        ctx.fillStyle = fallback;
         ctx.beginPath();
-        ctx.moveTo(x - tongueWidth, baseY + 1);
-        ctx.bezierCurveTo(x - tongueWidth * 1.45, baseY - flameHeight * .22, x + lean * .65, baseY - flameHeight * .62, x + lean, baseY - flameHeight);
-        ctx.bezierCurveTo(x + lean + tongueWidth * 1.15, baseY - flameHeight * .68, x + tongueWidth * 1.35, baseY - flameHeight * .24, x + tongueWidth, baseY + 1);
-        ctx.closePath(); ctx.fill();
+        ctx.ellipse(baseX, baseY - 13, 4, 15, sway, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.globalCompositeOperation = 'screen';
     }
     ctx.restore();
   }
@@ -1439,9 +1447,9 @@ class PenaltisGame {
   projectGoal3D(x, y, depth = 0) {
     const d = Math.max(0, Math.min(2.2, depth));
     return {
-      x: 200 + (x / 7.32 - .5) * 320 * (1 - d * .04),
+      x: 200 + (x / 7.32 - .5) * 320 * (1 - d * .02),
       // Las patas delanteras apoyan sobre la línea de gol de la imagen del estadio.
-      y: 328 - (y / 2.44) * 170 - d * 5.8
+      y: 328 - (y / 2.44) * 170 - d * 3.8
     };
   }
 
@@ -1449,22 +1457,59 @@ class PenaltisGame {
     const dx = b.x - a.x, dy = b.y - a.y;
     const length = Math.max(1, Math.hypot(dx, dy));
     const nx = -dy / length, ny = dx / length, radius = 3.2;
-    const midX = (a.x + b.x) * .5;
     ctx.save();
-    // Cancel the field's horizontal camera expansion locally, keeping each metal tube round.
-    ctx.translate(midX, 0); ctx.scale(1 / 1.5, 1); ctx.translate(-midX, 0);
     const metal = ctx.createLinearGradient(
       (a.x + b.x) * .5 - nx * radius, (a.y + b.y) * .5 - ny * radius,
       (a.x + b.x) * .5 + nx * radius, (a.y + b.y) * .5 + ny * radius);
     metal.addColorStop(0, '#344750'); metal.addColorStop(.18, '#b9cbd1');
     metal.addColorStop(.42, '#ffffff'); metal.addColorStop(.62, '#91a7af'); metal.addColorStop(1, '#344750');
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(a.x + 2, a.y + 5); ctx.lineTo(b.x + 2, b.y + 5);
-    ctx.strokeStyle = 'rgba(0,0,0,.48)'; ctx.lineWidth = radius * 2.3; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a.x + 1, a.y + 3); ctx.lineTo(b.x + 1, b.y + 3);
+    ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = radius * 2.7; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     ctx.strokeStyle = metal; ctx.lineWidth = radius * 2; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(a.x + nx * 1.5, a.y + ny * 1.5); ctx.lineTo(b.x + nx * 1.5, b.y + ny * 1.5);
-    ctx.strokeStyle = 'rgba(255,255,255,.58)'; ctx.lineWidth = .8; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.64)'; ctx.lineWidth = .9; ctx.stroke();
+    ctx.restore();
+  }
+
+  drawGoalFramePath(ctx, points, width) {
+    if (points.length < 2) return;
+    const trace = () => {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    };
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // One continuous path per frame keeps each upright and crossbar physically joined.
+    trace();
+    ctx.lineWidth = width * 1.75;
+    ctx.strokeStyle = 'rgba(0,0,0,.58)';
+    ctx.shadowColor = 'rgba(0,0,0,.3)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 3;
+    ctx.stroke();
+
+    trace();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.lineWidth = width;
+    const metal = ctx.createLinearGradient(0, points[0].y, 0, points[1].y);
+    metal.addColorStop(0, '#91a2a8');
+    metal.addColorStop(.32, '#f5f8f8');
+    metal.addColorStop(.68, '#c4d0d3');
+    metal.addColorStop(1, '#65777d');
+    ctx.strokeStyle = metal;
+    ctx.stroke();
+
+    trace();
+    ctx.lineWidth = Math.max(.8, width * .16);
+    ctx.strokeStyle = 'rgba(255,255,255,.58)';
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -1493,15 +1538,15 @@ class PenaltisGame {
     ctx.fillStyle = shade; ctx.beginPath(); ctx.moveTo(rearTL.x,rearTL.y); ctx.lineTo(rearTR.x,rearTR.y); ctx.lineTo(rearBR.x,rearBR.y); ctx.lineTo(rearBL.x,rearBL.y); ctx.closePath(); ctx.fill();
 
     // Deformable 3D back net: each knot carries position, velocity, spring tension and damping.
-    for (let c = 0; c <= this.netCols; c++) {
+    for (let c = 0; c <= this.netCols; c += 2) {
       ctx.beginPath();
       for (let r = 0; r <= this.netRows; r++) { const p = pointAt(r,c); if (!r) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
-      ctx.strokeStyle = c % 4 === 0 ? 'rgba(232,247,250,.7)' : 'rgba(175,214,223,.42)'; ctx.lineWidth = c % 4 === 0 ? .9 : .58; ctx.stroke();
+      ctx.strokeStyle = 'rgba(218,237,241,.34)'; ctx.lineWidth = .68; ctx.stroke();
     }
-    for (let r = 0; r <= this.netRows; r++) {
+    for (let r = 0; r <= this.netRows; r += 2) {
       ctx.beginPath();
       for (let c = 0; c <= this.netCols; c++) { const p = pointAt(r,c); if (!c) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
-      ctx.strokeStyle = r % 2 === 0 ? 'rgba(232,247,250,.6)' : 'rgba(175,214,223,.34)'; ctx.lineWidth = r % 2 === 0 ? .8 : .55; ctx.stroke();
+      ctx.strokeStyle = 'rgba(218,237,241,.3)'; ctx.lineWidth = .62; ctx.stroke();
     }
 
     // Roof, floor, and side curtains connect the back mesh to the front frame in real depth.
@@ -1514,13 +1559,12 @@ class PenaltisGame {
 
   renderAnimePosts(ctx) {
     const p = (x, y, z = 0) => this.projectGoal3D(x, y, z);
-    const frame = [
-      [p(0,0),p(0,2.44)],[p(0,2.44),p(7.32,2.44)],[p(7.32,2.44),p(7.32,0)],
-      [p(0,2.44),p(.16,2.39,1.8)],[p(7.32,2.44),p(7.16,2.39,1.8)],
-      [p(0,0),p(.16,.04,1.8)],[p(7.32,0),p(7.16,.04,1.8)],
-      [p(.16,.04,1.8),p(.16,2.39,1.8)],[p(.16,2.39,1.8),p(7.16,2.39,1.8)],
-      [p(7.16,2.39,1.8),p(7.16,.04,1.8)],[p(.16,.04,1.8),p(7.16,.04,1.8)]
+    const rearFrame = [p(.16,.04,1.8),p(.16,2.39,1.8),p(7.16,2.39,1.8),p(7.16,.04,1.8),p(.16,.04,1.8)];
+    const depthBraces = [
+      [p(0,0),p(.16,.04,1.8)],[p(0,2.44),p(.16,2.39,1.8)],
+      [p(7.32,0),p(7.16,.04,1.8)],[p(7.32,2.44),p(7.16,2.39,1.8)]
     ];
+    const frontFrame = [p(0,0),p(0,2.44),p(7.32,2.44),p(7.32,0)];
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.beginPath(); ctx.ellipse(200, 328, 178, 7, 0, 0, Math.PI*2); ctx.fill();
     // Metal sockets are flush with the grass at every upright support.
@@ -1532,7 +1576,10 @@ class PenaltisGame {
       ctx.fillStyle='#dce8eb'; ctx.beginPath(); ctx.arc(foot.x,foot.y,1,0,Math.PI*2); ctx.fill();
       ctx.restore();
     }
-    for (const [a,b] of frame) this.drawGoalTube(ctx,a,b);
+    // Draw the rear cage and its four depth braces first; the front U-frame caps every join.
+    this.drawGoalFramePath(ctx, rearFrame, 3.4);
+    for (const [a,b] of depthBraces) this.drawGoalTube(ctx,a,b);
+    this.drawGoalFramePath(ctx, frontFrame, 4.1);
     ctx.restore();
   }
 
