@@ -328,8 +328,10 @@ class OnlineArena {
       const name = document.createElement('strong'); name.textContent = keeper.name;
       const title = document.createElement('small'); title.textContent = keeper.title;
       const badge = document.createElement('span'); badge.className = 'keeper-card__badge';
-      badge.textContent = selected ? 'EQUIPADO' : unlocked ? 'DESBLOQUEADO' : `${keeper.unlockRating} PTS`;
-      info.append(name, title, badge); card.append(portrait, lockNotice, info); host.append(card);
+      badge.textContent = unlocked ? 'DESBLOQUEADO' : `${keeper.unlockRating} PTS`;
+      info.append(name, title);
+      if (!selected) info.append(badge);
+      card.append(portrait, lockNotice, info); host.append(card);
       library.paintPortrait(portrait, keeper, selected);
     });
     this.refs.goalkeeperSelectionStatus.textContent = !this.user || this.user.isGuest
