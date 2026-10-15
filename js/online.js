@@ -201,19 +201,29 @@ class OnlineArena {
   }
 
   async loadLeaderboard() {
-    try {
-      const { entries } = await this.api('/api/leaderboard');
-      this.refs.leaderboardList.replaceChildren();
-      const topTen = entries.slice(0, 10);
-      if (!topTen.length) {
-        this.refs.leaderboardList.append(this.makeLeaderboardMessage('Aún no hay jugadores en la clasificación. ¡Sé el primero en competir!'));
-      } else {
-        topTen.forEach(entry => this.refs.leaderboardList.append(this.makeLeaderboardRow(entry)));
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { entries } = await this.api('/api/leaderboard');
+        if (!Array.isArray(entries)) throw new Error('La respuesta del ranking no tiene el formato esperado.');
+
+        this.refs.leaderboardList.replaceChildren();
+        const topTen = entries.slice(0, 10);
+        if (!topTen.length) {
+          this.refs.leaderboardList.append(this.makeLeaderboardMessage('Aún no hay jugadores en la clasificación. ¡Sé el primero en competir!'));
+        } else {
+          topTen.forEach(entry => this.refs.leaderboardList.append(this.makeLeaderboardRow(entry)));
+        }
+        if (this.user && !this.user.isGuest) this.updateRankBadge(this.user);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await new Promise(resolve => window.setTimeout(resolve, 600 * (attempt + 1)));
       }
-      if (this.user && !this.user.isGuest) this.updateRankBadge(this.user);
-    } catch {
-      this.refs.leaderboardList.replaceChildren(this.makeLeaderboardMessage('No se pudo cargar el ranking. Inténtalo de nuevo más tarde.'));
     }
+
+    console.error('No se pudo cargar el ranking:', lastError);
+    this.refs.leaderboardList.replaceChildren(this.makeLeaderboardMessage('No se pudo cargar el ranking. Inténtalo de nuevo más tarde.'));
   }
 
   makeLeaderboardMessage(text) {
