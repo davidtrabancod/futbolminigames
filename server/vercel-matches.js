@@ -89,6 +89,7 @@ async function ensureSchema(sql) {
         expires_at BIGINT
       )`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0`;
       await sql`CREATE INDEX IF NOT EXISTS online_matches_players_state ON online_matches(player_one, player_two, state)`;
       await sql`CREATE TABLE IF NOT EXISTS online_queue (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -120,7 +121,7 @@ async function ensureSchema(sql) {
                  OR (better.rating = u.rating AND better.wins > u.wins)
                  OR (better.rating = u.rating AND better.wins = u.wins AND better.nickname_key < u.nickname_key)
             ),
-            'wins', u.wins, 'losses', u.losses, 'matches', u.matches
+            'wins', u.wins, 'losses', u.losses, 'matches', u.matches, 'winStreak', u.win_streak
           ) FROM users u WHERE u.id = p_user_id
         $function$`;
 
@@ -144,7 +145,9 @@ async function ensureSchema(sql) {
               'type', 'match-start', 'matchId', p_match_id, 'mode', m.mode, 'playerIndex', i,
               'you', arena_public_user(me_id), 'opponent', arena_public_user(other_id),
               'scores', to_jsonb(m.scores), 'shots', to_jsonb(m.shots),
-              'regulationShots', 3, 'ratingPoints', CASE WHEN m.mode = 'ranked' THEN 24 ELSE 0 END
+              'regulationShots', 3, 'ratingPoints', CASE WHEN m.mode = 'ranked'
+                THEN 24 + LEAST(COALESCE((SELECT win_streak FROM users WHERE id = me_id), 0) * 2, 12)
+                ELSE 0 END
             ), (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT);
             INSERT INTO online_match_events(match_id, recipient_user_id, event_type, payload, created_at)
             VALUES (p_match_id, me_id, 'turn', jsonb_build_object(
@@ -216,6 +219,7 @@ async function ensureSchema(sql) {
         LANGUAGE plpgsql AS $function$
         DECLARE m online_matches%ROWTYPE; ids INTEGER[]; before_ratings INTEGER[] := ARRAY[0,0]; after_ratings INTEGER[] := ARRAY[0,0];
           deltas INTEGER[] := ARRAY[0,0]; i INTEGER; user_row users%ROWTYPE; result_name TEXT; user_id INTEGER; other_id INTEGER;
+          new_streak INTEGER; point_gain INTEGER;
         BEGIN
           SELECT * INTO m FROM online_matches WHERE id = p_match_id FOR UPDATE;
           IF NOT FOUND OR m.state <> 'active' THEN RETURN; END IF;
@@ -224,19 +228,23 @@ async function ensureSchema(sql) {
             updated_at = (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT WHERE id = p_match_id;
           FOR i IN 1..2 LOOP
             user_id := ids[i];
-            SELECT * INTO user_row FROM users WHERE id = user_id;
+            SELECT * INTO user_row FROM users WHERE id = user_id FOR UPDATE;
             before_ratings[i] := user_row.rating;
             IF m.mode = 'ranked' AND p_winner_index IS NOT NULL THEN
-              after_ratings[i] := GREATEST(0, user_row.rating + CASE WHEN p_winner_index = i - 1 THEN 24 ELSE -24 END);
+              new_streak := CASE WHEN p_winner_index = i - 1 THEN user_row.win_streak + 1 ELSE 0 END;
+              point_gain := CASE WHEN p_winner_index = i - 1 THEN 24 + LEAST((new_streak - 1) * 2, 12) ELSE -24 END;
+              after_ratings[i] := GREATEST(0, user_row.rating + point_gain);
               deltas[i] := after_ratings[i] - before_ratings[i];
               UPDATE users SET rating = after_ratings[i],
                 wins = wins + CASE WHEN p_winner_index = i - 1 THEN 1 ELSE 0 END,
                 losses = losses + CASE WHEN p_winner_index = i - 1 THEN 0 ELSE 1 END,
-                matches = matches + 1, updated_at = (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT
+                matches = matches + 1, win_streak = new_streak,
+                updated_at = (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT
                 WHERE id = user_id;
             ELSE
               after_ratings[i] := before_ratings[i];
-              UPDATE users SET matches = matches + 1, updated_at = (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT
+              UPDATE users SET matches = matches + 1,
+                updated_at = (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT
                 WHERE id = user_id;
             END IF;
           END LOOP;

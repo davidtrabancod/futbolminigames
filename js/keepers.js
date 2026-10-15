@@ -25,7 +25,7 @@
       paintPortrait(canvas, canvas.dataset.keeperId, canvas.parentElement.classList.contains('is-equipped')));
   }
 
-  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0) {
+  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0, ballContact = null) {
     if (!cardArt?.complete || !cardArt.naturalWidth) return;
     const p = byId(keeper);
     const frameSize = 256;
@@ -36,7 +36,18 @@
     const idlePhase = time * [1.2, 2.7, 1.1, .8, 1.9, 1.35, 1.05, .9][p.artIndex];
     const breath = Math.sin(idlePhase);
     const diveFrame = direction < 0 ? 2 : direction > 0 ? 3 : 1;
-    const footX = x + (diving ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
+    // Dive poses reach about 113px sideways and 72px upward from the sprite
+    // center in source-image pixels. Shift the body along that reach vector so the leading glove meets
+    // the shot's actual destination instead of stopping beside the ball.
+    let contactOffsetX = 0, contactOffsetY = 0;
+    if (diving && ballContact && direction) {
+      const gloveX = x + direction * 113 * spriteScale;
+      const gloveY = y - 28 - 72 * spriteScale;
+      const correction = Math.min(1, motion * 1.35);
+      contactOffsetX = (ballContact.x - gloveX) * correction;
+      contactOffsetY = (ballContact.y - gloveY) * correction;
+    }
+    const footX = x + contactOffsetX + (diving ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
     const footY = y + 40 + breath * .8 - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
 
     const drawPose = (pose, alpha, offsetX = 0, offsetY = 0, angle = 0) => {
@@ -44,8 +55,8 @@
       const sourceX = pose * frameSize;
       const sourceY = p.artIndex * frameSize;
       const standing = pose < 2;
-      const anchorX = x + offsetX;
-      const anchorY = standing ? footY + offsetY : y - 28 + offsetY;
+      const anchorX = x + contactOffsetX + offsetX;
+      const anchorY = (standing ? footY : y - 28) + contactOffsetY + offsetY;
       const left = anchorX - frameSize * spriteScale / 2;
       const top = standing
         ? anchorY - 244 * spriteScale

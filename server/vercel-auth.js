@@ -41,6 +41,7 @@ async function ensureSchema(sql) {
         created_at BIGINT NOT NULL
       )`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS keeper_id TEXT NOT NULL DEFAULT 'rookie'`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0`;
       await sql`CREATE INDEX IF NOT EXISTS sessions_user_id ON sessions(user_id)`;
       await sql`CREATE INDEX IF NOT EXISTS users_leaderboard ON users(rating DESC, wins DESC, nickname_key ASC)`;
       await sql`CREATE TABLE IF NOT EXISTS auth_attempts (
@@ -91,7 +92,8 @@ function publicUser(row, rank) {
     rank,
     wins: row.wins,
     losses: row.losses,
-    matches: row.matches
+    matches: row.matches,
+    winStreak: row.win_streak || 0
   };
 }
 

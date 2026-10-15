@@ -31,6 +31,7 @@ class ArenaDatabase {
         wins INTEGER NOT NULL DEFAULT 0,
         losses INTEGER NOT NULL DEFAULT 0,
         matches INTEGER NOT NULL DEFAULT 0,
+        win_streak INTEGER NOT NULL DEFAULT 0,
         keeper_id TEXT NOT NULL DEFAULT 'rookie',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
@@ -61,6 +62,9 @@ class ArenaDatabase {
     const userColumns = this.db.prepare('PRAGMA table_info(users)').all();
     if (!userColumns.some(column => column.name === 'keeper_id')) {
       this.db.exec("ALTER TABLE users ADD COLUMN keeper_id TEXT NOT NULL DEFAULT 'rookie'");
+    }
+    if (!userColumns.some(column => column.name === 'win_streak')) {
+      this.db.exec('ALTER TABLE users ADD COLUMN win_streak INTEGER NOT NULL DEFAULT 0');
     }
     this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
   }
@@ -104,7 +108,8 @@ class ArenaDatabase {
       rank,
       wins: row.wins,
       losses: row.losses,
-      matches: row.matches
+      matches: row.matches,
+      winStreak: row.win_streak || 0
     };
   }
 
@@ -228,13 +233,17 @@ class ArenaDatabase {
         ratingResults = ratingResults.map((item, index) => {
           if (index === botIndex) return item;
           const won = index === winnerIndex;
-          const delta = won ? RATING_POINTS : -RATING_POINTS;
+          const user = this.db.prepare('SELECT win_streak FROM users WHERE id = ?').get(item.id);
+          const streak = won ? (user.win_streak || 0) + 1 : 0;
+          const bonus = won ? Math.min((streak - 1) * 2, 12) : 0;
+          const delta = won ? RATING_POINTS + bonus : -RATING_POINTS;
           const after = Math.max(0, item.before + delta);
           this.db.prepare(`
             UPDATE users
-            SET rating = ?, wins = wins + ?, losses = losses + ?, matches = matches + 1, updated_at = ?
+            SET rating = ?, wins = wins + ?, losses = losses + ?, matches = matches + 1,
+                win_streak = ?, updated_at = ?
             WHERE id = ?
-          `).run(after, won ? 1 : 0, won ? 0 : 1, Date.now(), item.id);
+          `).run(after, won ? 1 : 0, won ? 0 : 1, streak, Date.now(), item.id);
           return { ...item, after, delta: after - item.before };
         });
       } else if (rated && winnerIndex === null) {

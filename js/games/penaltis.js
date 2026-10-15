@@ -1405,7 +1405,10 @@ class PenaltisGame {
     if (this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
       window.GOALKEEPER_ROSTER.draw(
         ctx, this.onlineGoalkeeperId, k.x, k.y, 1, this.timer || 0,
-        k.diving, k.rotation, k.diveProgress, k.anticipating, k.diveDirection, k.state, k.landingTimer
+        k.diving, k.rotation, k.diveProgress, k.anticipating, k.diveDirection, k.state, k.landingTimer,
+        this.onlineVisualIsGoal === false && this.ball?.selectedZone
+          ? { x: this.ball.targetX, y: this.ball.targetY }
+          : null
       );
       return;
     }
