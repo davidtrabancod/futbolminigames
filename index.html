@@ -278,11 +278,15 @@
             </div>
 
             <div class="online-hub__actions">
-              <button id="rankedMatchBtn" class="btn-arcade btn-arcade-green online-action" type="button">
-                🔎 Buscar rival
+              <button id="rankedMatchBtn" class="btn-arcade btn-arcade-green online-action online-action--ranked" type="button">
+                <span class="online-action__icon" aria-hidden="true">⌖</span>
+                <span class="online-action__copy"><small>PARTIDA CLASIFICATORIA</small><strong>BUSCAR RIVAL</strong></span>
+                <span class="online-action__arrow" aria-hidden="true">↗</span>
               </button>
-              <button id="createFriendlyBtn" class="btn-arcade btn-arcade-blue online-action" type="button">
-                🤝 Invitar a un amigo
+              <button id="createFriendlyBtn" class="btn-arcade btn-arcade-blue online-action online-action--friendly" type="button">
+                <span class="online-action__icon" aria-hidden="true">⚑</span>
+                <span class="online-action__copy"><small>DUELO PRIVADO</small><strong>INVITAR A UN AMIGO</strong></span>
+                <span class="online-action__arrow" aria-hidden="true">↗</span>
               </button>
             </div>
             <div id="matchmakingBanner" class="matchmaking-banner hidden" role="status" aria-live="polite" aria-atomic="true">
