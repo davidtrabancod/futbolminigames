@@ -226,9 +226,14 @@ class App {
     this.renderErrorLogged = false;
 
     this.menuScreen.classList.add('hidden');
+    this.menuScreen.style.display = 'none';
     this.onlineMatchScreen.classList.add('hidden');
     this.gameScreen.classList.remove('hidden');
+    this.gameScreen.style.display = 'flex';
     this.resizeCanvas?.();
+    const onlineResult = document.getElementById('onlineMatchResult');
+    onlineResult?.classList.add('hidden');
+    if (onlineResult) onlineResult.style.display = 'none';
     this.pauseModal.classList.add('hidden');
     this.gameOverModal.classList.add('hidden');
     this.pauseBtn.classList.remove('hidden');
@@ -247,9 +252,14 @@ class App {
 
     // Ocultar pantallas de menú y mostrar el canvas de juego general
     this.menuScreen.classList.add('hidden');
+    this.menuScreen.style.display = 'none';
     this.onlineMatchScreen.classList.add('hidden');
     this.gameScreen.classList.remove('hidden');
+    this.gameScreen.style.display = 'flex';
     this.resizeCanvas?.();
+    const onlineResult = document.getElementById('onlineMatchResult');
+    onlineResult?.classList.add('hidden');
+    if (onlineResult) onlineResult.style.display = 'none';
     document.getElementById('pauseBtn')?.classList.add('hidden');
     document.getElementById('forfeitOnlineBtn')?.classList.remove('hidden');
     this.pauseModal.classList.add('hidden');
@@ -306,8 +316,10 @@ class App {
     this.activeGame = this.games.penaltis;
 
     this.menuScreen.classList.add('hidden');
+    this.menuScreen.style.display = 'none';
     this.onlineMatchScreen.classList.add('hidden'); // Ocultar la caja flotante antigua
     this.gameScreen.classList.remove('hidden');     // Mostrar el canvas principal de juego
+    this.gameScreen.style.display = 'flex';
     this.pauseModal.classList.add('hidden');
     this.gameOverModal.classList.add('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -319,8 +331,13 @@ class App {
     this.activeGameId = null;
 
     this.menuScreen.classList.remove('hidden');
+    this.menuScreen.style.removeProperty('display');
     this.onlineMatchScreen.classList.add('hidden');
     this.gameScreen.classList.add('hidden');
+    this.gameScreen.style.display = 'none';
+    const onlineResult = document.getElementById('onlineMatchResult');
+    onlineResult?.classList.add('hidden');
+    if (onlineResult) onlineResult.style.display = 'none';
     this.pauseModal.classList.add('hidden');
     this.gameOverModal.classList.add('hidden');
     this.pauseBtn.classList.remove('hidden');

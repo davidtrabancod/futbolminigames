@@ -140,6 +140,7 @@ class OnlineArena {
     });
     document.getElementById('onlinePlayAgainBtn').addEventListener('click', () => {
       this.refs.onlineMatchResult.classList.add('hidden');
+      this.refs.onlineMatchResult.style.display = 'none';
       if (this.currentMode === 'friendly') this.createFriendlyMatch();
       else this.startRankedQueue();
     });
@@ -719,14 +720,21 @@ class OnlineArena {
     this.refs.onlineOpponentName.textContent = opponent.nickname || 'Rival';
     this.refs.onlineOpponentMeta.textContent = isNormal ? 'SIN PUNTOS' : opponent.isGuest ? 'INVITADO' : `${opponent.rating ?? 1000} pts`;
 
-    if (this.app.gameScreen) this.app.gameScreen.classList.remove('hidden');
+    if (this.app.gameScreen) {
+      this.app.gameScreen.classList.remove('hidden');
+      this.app.gameScreen.style.display = 'flex';
+    }
     this.app.resizeCanvas?.();
     if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.add('hidden');
     this.refs.forfeitOnlineBtn.classList.remove('hidden');
     document.getElementById('pauseBtn')?.classList.add('hidden');
     this.refs.onlineMatchResult.classList.add('hidden');
+    this.refs.onlineMatchResult.style.display = 'none';
     this.refs.cancelOnlineBtn.classList.add('hidden');
-    if (this.app.menuScreen) this.app.menuScreen.classList.add('hidden');
+    if (this.app.menuScreen) {
+      this.app.menuScreen.classList.add('hidden');
+      this.app.menuScreen.style.display = 'none';
+    }
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     this.updateScoreboard(message.scores, message.shots, false);
@@ -896,8 +904,10 @@ class OnlineArena {
     if (updatedUser) this.setUser(updatedUser);
     this.app.gameState = 'online-result';
     this.app.gameScreen?.classList.add('hidden');
+    if (this.app.gameScreen) this.app.gameScreen.style.display = 'none';
     this.refs.onlineMatchResult.classList.remove('hidden', 'is-win', 'is-loss', 'is-draw');
     this.refs.onlineMatchResult.classList.add(won ? 'is-win' : draw ? 'is-draw' : 'is-loss');
+    this.refs.onlineMatchResult.style.display = 'flex';
     this.refs.onlineMatchScreen.classList.remove('hidden');
     this.refs.forfeitOnlineBtn.classList.add('hidden');
 
