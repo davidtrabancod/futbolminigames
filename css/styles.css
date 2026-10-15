@@ -3204,3 +3204,29 @@ body > footer {
   .online-hub__modebar-label i { animation:none; }
   .online-hub__modebar::after { animation:none; display:none; }
 }
+
+/* Make the currently equipped keeper read as the active character at a glance. */
+.keeper-card.is-equipped {
+  z-index:2;
+  border:2px solid #ffe45e;
+  background:radial-gradient(ellipse at 50% 24%,color-mix(in srgb,var(--keeper-accent) 42%,#09282a),transparent 62%),linear-gradient(160deg,#0c5147,#07131d 72%);
+  box-shadow:0 0 0 2px rgba(255,228,94,.2),0 0 15px rgba(255,214,75,.34),0 0 30px color-mix(in srgb,var(--keeper-accent) 38%,transparent),inset 0 0 22px rgba(255,222,84,.1);
+  animation:equippedKeeperPulse 2.8s ease-in-out infinite;
+}
+.keeper-card.is-equipped::before {
+  position:absolute; z-index:3; top:.45rem; right:.4rem; content:"★ TITULAR";
+  padding:.23rem .38rem; border:1px solid #fff0a0; border-radius:3px;
+  color:#171809; background:linear-gradient(180deg,#fff28a,#ffc629);
+  box-shadow:0 0 12px rgba(255,218,75,.72),0 2px 5px rgba(0,0,0,.5);
+  font:900 .56rem var(--font-kids); letter-spacing:.08em; text-shadow:0 1px rgba(255,255,255,.4);
+}
+.keeper-card.is-equipped .keeper-card__portrait {
+  filter:drop-shadow(0 0 8px color-mix(in srgb,var(--keeper-accent) 62%,transparent));
+}
+.keeper-card.is-equipped .keeper-card__info { background:linear-gradient(180deg,rgba(38,32,8,.88),rgba(5,15,25,.98)); }
+.keeper-card.is-equipped .keeper-card__badge { border-color:#ffe45e; color:#fff08a; background:rgba(255,208,51,.16); box-shadow:0 0 10px rgba(255,208,51,.18); }
+@keyframes equippedKeeperPulse {
+  0%,100% { box-shadow:0 0 0 2px rgba(255,228,94,.16),0 0 13px rgba(255,214,75,.28),0 0 25px color-mix(in srgb,var(--keeper-accent) 30%,transparent),inset 0 0 18px rgba(255,222,84,.07); }
+  50% { box-shadow:0 0 0 3px rgba(255,228,94,.26),0 0 20px rgba(255,214,75,.48),0 0 36px color-mix(in srgb,var(--keeper-accent) 45%,transparent),inset 0 0 25px rgba(255,222,84,.14); }
+}
+@media (prefers-reduced-motion:reduce) { .keeper-card.is-equipped { animation:none; } }
