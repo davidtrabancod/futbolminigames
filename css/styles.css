@@ -3102,3 +3102,59 @@ body > footer {
   transition:filter .2s ease,transform .2s ease;
 }
 .group:hover .brand-mark { filter:drop-shadow(0 0 15px rgba(255,190,52,.65)); transform:rotate(-5deg) scale(1.04); }
+
+/* Penalty Rush arcade identity: high impact display type and cabinet controls. */
+.header-brand { display:flex; align-items:center; gap:.65rem; min-width:0; text-decoration:none; }
+.brand-mark { width:3rem; height:3rem; filter:drop-shadow(0 0 12px rgba(0,242,190,.36)); }
+.brand-wordmark {
+  display:block; color:#ffe34e; font-family:'Bungee',var(--font-display); font-size:clamp(1.05rem,2.45vw,1.75rem);
+  line-height:1; letter-spacing:.025em; white-space:nowrap; text-shadow:0 2px 0 #80500b,0 0 17px rgba(255,210,54,.28);
+  transform:skewX(-4deg);
+}
+.brand-wordmark b { color:#f5fbff; font-weight:inherit; text-shadow:0 2px 0 #264b62,0 0 14px rgba(99,223,255,.22); }
+.brand-kicker {
+  display:inline-block; margin-top:.28rem; padding:.12rem .36rem; border-left:2px solid #00edbb;
+  color:#79ffe0; background:linear-gradient(90deg,rgba(0,237,187,.12),transparent);
+  font:800 .52rem var(--font-kids); letter-spacing:.25em; line-height:1;
+}
+.online-hub__heading h2,
+.online-hub__play .online-hub__duel-heading h3 {
+  font-family:'Bungee',var(--font-display); font-weight:400; letter-spacing:.015em;
+  line-height:1.12; text-shadow:0 3px 0 #754914,0 0 22px rgba(255,206,61,.35);
+}
+.online-hub__heading h2 { color:#fff0a5; font-size:clamp(1.5rem,4vw,2.65rem); }
+.online-hub__heading p { max-width:54rem; margin-inline:auto; color:#c5eee6; font-family:var(--font-kids); font-weight:600; }
+.header-rating {
+  position:relative; min-height:2.75rem; padding:.35rem .72rem; gap:.38rem; overflow:hidden;
+  border:1px solid rgba(255,206,58,.82); border-radius:.38rem;
+  background:linear-gradient(145deg,rgba(54,39,9,.92),rgba(7,17,24,.98) 72%);
+  box-shadow:inset 0 1px rgba(255,248,189,.16),0 0 0 2px rgba(255,197,41,.09),0 0 18px rgba(255,188,35,.12);
+  color:#ffe466; font-family:'Barlow Condensed',var(--font-display); font-size:1.25rem; font-weight:900;
+  font-variant-numeric:tabular-nums; letter-spacing:.045em;
+}
+.header-rating::after { position:absolute; right:.45rem; bottom:.16rem; left:.45rem; height:1px; content:""; background:linear-gradient(90deg,transparent,#ffe35a,transparent); opacity:.75; }
+.header-rating small { color:#ffce51; font-family:var(--font-kids); font-size:.52rem; font-weight:900; }
+.profile-button {
+  border:1px solid rgba(0,232,185,.7); border-radius:.38rem; background:linear-gradient(145deg,#0b493f,#061923 78%);
+  box-shadow:inset 0 1px rgba(255,255,255,.1),0 3px 0 #03291f,0 0 14px rgba(0,232,185,.12);
+  font-family:var(--font-kids); letter-spacing:.025em;
+}
+.header-control {
+  position:relative; width:2.75rem; height:2.75rem; border:1px solid #00e5ad!important; border-radius:.38rem!important;
+  background:linear-gradient(145deg,#08705b,#04392f)!important; color:#d7fff3;
+  box-shadow:inset 0 1px rgba(255,255,255,.2),0 3px 0 #02291f,0 0 13px rgba(0,229,173,.16)!important;
+  transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;
+}
+.header-control:hover { filter:brightness(1.25); transform:translateY(-2px); box-shadow:inset 0 1px rgba(255,255,255,.24),0 5px 0 #02291f,0 0 21px rgba(0,229,173,.34)!important; }
+.header-control:active { transform:translateY(1px); box-shadow:inset 0 1px rgba(255,255,255,.14),0 1px 0 #02291f!important; }
+@media (max-width:560px) {
+  .brand-mark { width:2.35rem; height:2.35rem; }
+  .brand-wordmark { font-size:clamp(.88rem,4vw,1.25rem); }
+  .brand-kicker { font-size:.43rem; letter-spacing:.18em; }
+  .header-rating { min-height:2.35rem; padding:.28rem .42rem; font-size:1.05rem; }
+  .header-control { width:2.35rem; height:2.35rem; }
+  .profile-button { height:2.35rem; max-width:6.7rem; padding:.3rem .45rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .brand-mark,.header-control { transition:none!important; }
+}

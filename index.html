@@ -19,7 +19,7 @@
   <meta name="theme-color" content="#15803d">
   <link rel="canonical" href="https://tu-proyecto.vercel.app/">
 
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Bungee&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Soporte Multilingüe Hreflang -->
   <link rel="alternate" hreflang="es" href="https://tu-proyecto.vercel.app/">
@@ -201,15 +201,11 @@
   <header class="sticky top-0 z-40 bg-emerald-900/90 backdrop-blur-md border-b-4 border-emerald-700/60 shadow-lg px-4 py-2.5 transition-all">
     <div class="max-w-5xl mx-auto flex items-center justify-between">
       <!-- Logotipo y Nombre de la Plataforma -->
-      <a href="./index.html" class="flex items-center gap-2 group" aria-label="Penalty Rush - Inicio">
+      <a href="./index.html" class="header-brand group" aria-label="Penalty Rush - Inicio">
         <img src="./penalty-rush.svg" class="brand-mark" alt="" aria-hidden="true">
         <div>
-          <span class="text-xl sm:text-2xl font-black tracking-wide text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
-            PENALTY <span class="text-white">RUSH</span>
-          </span>
-          <span class="hidden xs:inline-block text-[10px] bg-yellow-400 text-emerald-950 px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ml-1">
-            ONLINE ARENA
-          </span>
+          <span class="brand-wordmark">PENALTY <b>RUSH</b></span>
+          <span class="brand-kicker">ONLINE ARENA</span>
         </div>
       </a>
 
@@ -228,12 +224,12 @@
         </button>
 
         <!-- Botón de Sonido Sintetizado Procedural -->
-        <button id="soundBtn" class="w-10 h-10 rounded-xl bg-emerald-800 hover:bg-emerald-700 active:scale-90 border-2 border-emerald-600 flex items-center justify-center text-xl shadow transition" aria-label="Alternar sonido" title="Sonido">
+        <button id="soundBtn" class="header-control w-10 h-10 rounded-xl bg-emerald-800 hover:bg-emerald-700 active:scale-90 border-2 border-emerald-600 flex items-center justify-center text-xl shadow transition" aria-label="Alternar sonido" title="Sonido">
           <span id="soundIcon">🔊</span>
         </button>
 
         <!-- Botón de Pantalla Completa (Mobile Fullscreen) -->
-        <button id="fullscreenBtn" class="hidden sm:flex w-10 h-10 rounded-xl bg-emerald-800 hover:bg-emerald-700 active:scale-90 border-2 border-emerald-600 items-center justify-center text-lg shadow transition" aria-label="Pantalla Completa" title="Pantalla Completa">
+        <button id="fullscreenBtn" class="header-control hidden sm:flex w-10 h-10 rounded-xl bg-emerald-800 hover:bg-emerald-700 active:scale-90 border-2 border-emerald-600 items-center justify-center text-lg shadow transition" aria-label="Pantalla Completa" title="Pantalla Completa">
           <span>⛶</span>
         </button>
       </div>
