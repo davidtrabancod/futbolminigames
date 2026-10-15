@@ -68,7 +68,7 @@ class PenaltisGame {
 
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
-    this.arenaBackground.src = './assets/penalty-stadium-landscape.png';
+    this.arenaBackground.src = './assets/penalty-stadium-torches.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
       x: 20 + Math.random() * 920,
       y: 105 + Math.random() * 180,
@@ -134,18 +134,24 @@ class PenaltisGame {
   // ----------------------
 
   initNetMesh() {
-    this.netCols = 16;
-    this.netRows = 10;
+    this.netCols = 32;
+    this.netRows = 16;
     this.netNodes = [];
 
-    const gx = 60, gy = 110, gw = 280, gh = 170;
+    const gx = 40, gy = 110, gw = 320, gh = 170;
     for (let r = 0; r <= this.netRows; r++) {
       this.netNodes[r] = [];
       for (let c = 0; c <= this.netCols; c++) {
+        const u = c / this.netCols;
+        const v = r / this.netRows;
         this.netNodes[r][c] = {
-          origX: gx + (c / this.netCols) * gw,
-          origY: gy + (r / this.netRows) * gh,
-          z: 0,
+          origX: u * 7.32,
+          origY: (1 - v) * 2.44,
+          x: u * 7.32,
+          y: (1 - v) * 2.44,
+          depth: 1.8,
+          vx: 0,
+          vy: 0,
           vz: 0
         };
       }
@@ -259,10 +265,10 @@ class PenaltisGame {
   renderOnlineScoreboardOverlay(ctx) {
     ctx.save();
     
-    const boxX = 12;
+    const boxX = 198;
     const boxY = 8;
-    const boxW = 376;
-    const boxH = 64;
+    const boxW = 564;
+    const boxH = 70;
     
     // Sombra exterior profunda 3D (NO TOCAR)
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
@@ -309,8 +315,8 @@ class PenaltisGame {
     // ==========================================
     // PISO SUPERIOR: DESTELLO POR DEBAJO + NOMBRES
     // ==========================================
-    const sweepProgress = (this.timer * 0.7) % 3.0; 
-    const sweepX = boxX + 14 + (sweepProgress * 120);
+    const sweepProgress = ((this.timer * 0.7) % 3.0) / 3.0;
+    const sweepX = boxX + 14 + (boxW - 28) * sweepProgress;
 
     ctx.save();
     ctx.beginPath();
@@ -350,7 +356,7 @@ class PenaltisGame {
     // ==========================================
     // PISO INFERIOR: PUNTUACIÓN Y PENALTIS (MÁXIMO 4 CÍRCULOS: 3 NORMALES + 1 EXTRA DE MUERTE SÚBITA)
     // ==========================================
-    const infY = boxY + 46;
+    const infY = boxY + 51;
 
     // --- LADO IZQUIERDO (TÚ) ---
     ctx.fillStyle = '#ffffff';
@@ -588,12 +594,12 @@ class PenaltisGame {
       const side = Math.random() < .5 ? 1 : -1;
       const sourceX = side > 0 ? 930 : 30;
       this.fireEmbers.push({
-        x: sourceX + (Math.random() - .5) * 30,
-        y: 330 + Math.random() * 24,
-        vx: -side * (8 + Math.random() * 28) + (Math.random() - .5) * 12,
-        vy: -(38 + Math.random() * 85),
-        size: 1 + Math.random() * 3.5,
-        life: .7 + Math.random() * 1.25,
+        x: sourceX + (Math.random() - .5) * 16,
+        y: 254 + Math.random() * 10,
+        vx: -side * (3 + Math.random() * 14) + (Math.random() - .5) * 7,
+        vy: -(34 + Math.random() * 58),
+        size: .8 + Math.random() * 2.4,
+        life: .6 + Math.random() * .9,
         age: 0,
         hue: Math.random() < .5 ? 24 : 42
       });
@@ -755,11 +761,24 @@ class PenaltisGame {
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
-        const springForce = (0 - node.z) * 18;
-        node.vz += springForce * dt;
-        node.vz *= Math.exp(-3.8 * dt);
-        node.z += node.vz * dt;
-        if (Math.abs(node.z) < .025 && Math.abs(node.vz) < .08) node.z = node.vz = 0;
+        const left = this.netNodes[r][Math.max(0, c - 1)];
+        const right = this.netNodes[r][Math.min(this.netCols, c + 1)];
+        const up = this.netNodes[Math.max(0, r - 1)][c];
+        const down = this.netNodes[Math.min(this.netRows, r + 1)][c];
+        const edge = c === 0 || c === this.netCols || r === 0 || r === this.netRows;
+        const stiffness = edge ? 68 : 32;
+        const neighborX = (left.x + right.x + up.x + down.x) * .25;
+        const neighborY = (left.y + right.y + up.y + down.y) * .25;
+        const neighborDepth = (left.depth + right.depth + up.depth + down.depth) * .25;
+        node.vx += ((node.origX - node.x) * stiffness + (neighborX - node.x) * 9) * dt;
+        node.vy += ((node.origY - node.y) * stiffness + (neighborY - node.y) * 9) * dt;
+        node.vz += ((1.8 - node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
+        const damping = Math.exp(-5.2 * dt);
+        node.vx *= damping; node.vy *= damping; node.vz *= damping;
+        node.x += node.vx * dt; node.y += node.vy * dt; node.depth += node.vz * dt;
+        if (Math.abs(node.x - node.origX) < .0008 && Math.abs(node.vx) < .012) node.x = node.origX, node.vx = 0;
+        if (Math.abs(node.y - node.origY) < .0008 && Math.abs(node.vy) < .012) node.y = node.origY, node.vy = 0;
+        if (Math.abs(node.depth - 1.8) < .0008 && Math.abs(node.vz) < .012) node.depth = 1.8, node.vz = 0;
       }
     }
 
@@ -775,14 +794,20 @@ class PenaltisGame {
   }
 
   bulgeNet(impactX, impactY, depth = 45) {
+    const hitX = Math.max(0, Math.min(7.32, ((impactX - this.goal.x) / this.goal.w) * 7.32));
+    const hitY = Math.max(0, Math.min(2.44, ((this.goal.y + this.goal.h - impactY) / this.goal.h) * 2.44));
+    const impulse = Math.max(.8, Math.min(4.4, depth * .075));
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
-        const dist = Math.hypot(node.origX - impactX, node.origY - impactY);
-        if (dist < 70) {
-          const power = (1 - dist / 70) * depth;
-          node.z = power;
-          node.vz = power * 3;
+        const dx = node.origX - hitX;
+        const dy = node.origY - hitY;
+        const dist = Math.hypot(dx, dy * 1.35);
+        if (dist < 1.35) {
+          const falloff = Math.pow(1 - dist / 1.35, 2);
+          node.vz += impulse * falloff;
+          node.vx += dx * falloff * .72;
+          node.vy += dy * falloff * .62;
         }
       }
     }
@@ -1009,22 +1034,18 @@ class PenaltisGame {
     ctx.restore();
 
     if (this.isOnlineMode) {
-      ctx.save();
-      ctx.translate(sceneOffsetX, 0);
-      ctx.scale(sceneScaleX, 1);
       this.renderOnlineRoleBanner(ctx);
       this.renderOnlineScoreboardOverlay(ctx);
-      ctx.restore();
     }
   }
 
   renderOnlineRoleBanner(ctx) {
     ctx.save();
     ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
-    ctx.fillRect(80, 45, 240, 36);
+    ctx.fillRect(390, 78, 180, 25);
     ctx.strokeStyle = this.onlineRole === 'lanzador' ? '#facc15' : '#38bdf8';
     ctx.lineWidth = 3;
-    ctx.strokeRect(80, 45, 240, 36);
+    ctx.strokeRect(390, 78, 180, 25);
 
     ctx.fillStyle = this.onlineRole === 'lanzador' ? '#facc15' : '#38bdf8';
     ctx.font = '900 14px Fredoka, sans-serif';
@@ -1032,7 +1053,7 @@ class PenaltisGame {
     ctx.textBaseline = 'middle';
     
     const text = this.onlineRole === 'lanzador' ? '🎯 TURNO: LANZADOR' : '🧤 TURNO: PORTERO';
-    ctx.fillText(text, 200, 63);
+    ctx.fillText(text, 480, 90);
     ctx.restore();
   }
 
@@ -1133,33 +1154,35 @@ class PenaltisGame {
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     const height = this.app.virtualHeight;
-    for (const sourceX of [30, this.app.virtualWidth - 30]) {
+    for (const [index, sourceX] of [30, this.app.virtualWidth - 30].entries()) {
       const phase = this.timer * 5.8 + sourceX;
-      const baseY = height * .49;
-      const flicker = .88 + Math.sin(phase) * .12;
-      const glow = ctx.createRadialGradient(sourceX, baseY - 14, 4, sourceX, baseY - 5, 98);
-      glow.addColorStop(0, `rgba(255,171,54,${.32 * flicker})`);
-      glow.addColorStop(.34, `rgba(255,82,22,${.16 * flicker})`);
+      const baseY = height * .423;
+      const flicker = .78 + Math.sin(phase) * .12 + Math.sin(phase * 2.7) * .1;
+      const torchX = index === 0 ? sourceX + 7 : sourceX - 7;
+      const glow = ctx.createRadialGradient(torchX, baseY - 8, 2, torchX, baseY, 66);
+      glow.addColorStop(0, `rgba(255,178,70,${.46 * flicker})`);
+      glow.addColorStop(.34, `rgba(255,82,22,${.19 * flicker})`);
       glow.addColorStop(1, 'rgba(255,55,15,0)');
       ctx.fillStyle = glow;
-      ctx.fillRect(sourceX - 100, baseY - 105, 200, 170);
+      ctx.fillRect(torchX - 72, baseY - 78, 144, 118);
       ctx.globalCompositeOperation = 'lighter';
-      for (let tongue = 0; tongue < 6; tongue++) {
-        const phaseTongue = phase + tongue * 1.7;
-        const x = sourceX + Math.sin(phaseTongue * .73) * (8 + tongue * 1.2);
-        const flameHeight = (26 + (Math.sin(phaseTongue) + 1) * 13) * flicker;
-        const tongueWidth = 5 + (Math.cos(phaseTongue * .8) + 1) * 3;
-        const lean = Math.sin(phaseTongue * .45) * 8;
+      for (let tongue = 0; tongue < 7; tongue++) {
+        const phaseTongue = phase + tongue * 1.53;
+        const x = torchX + Math.sin(phaseTongue * .73) * (5 + tongue * .8);
+        const flameHeight = (42 + (Math.sin(phaseTongue) + 1) * 21) * flicker;
+        const tongueWidth = 4 + (Math.cos(phaseTongue * .8) + 1) * 3.2;
+        const lean = Math.sin(phaseTongue * .45) * 6;
         const flame = ctx.createLinearGradient(x, baseY, x + lean, baseY - flameHeight);
-        flame.addColorStop(0, 'rgba(255,69,10,.08)');
-        flame.addColorStop(.4, 'rgba(255,102,18,.8)');
-        flame.addColorStop(.78, 'rgba(255,201,66,.94)');
-        flame.addColorStop(1, 'rgba(255,249,202,.05)');
+        flame.addColorStop(0, 'rgba(255,53,8,.12)');
+        flame.addColorStop(.3, 'rgba(255,83,14,.88)');
+        flame.addColorStop(.68, 'rgba(255,154,35,.97)');
+        flame.addColorStop(.9, 'rgba(255,224,115,.9)');
+        flame.addColorStop(1, 'rgba(255,249,202,.02)');
         ctx.fillStyle = flame;
         ctx.beginPath();
-        ctx.moveTo(x - tongueWidth, baseY);
-        ctx.quadraticCurveTo(x - tongueWidth * 1.2, baseY - flameHeight * .48, x + lean, baseY - flameHeight);
-        ctx.quadraticCurveTo(x + tongueWidth * 1.4, baseY - flameHeight * .4, x + tongueWidth, baseY);
+        ctx.moveTo(x - tongueWidth, baseY + 1);
+        ctx.bezierCurveTo(x - tongueWidth * 1.45, baseY - flameHeight * .22, x + lean * .65, baseY - flameHeight * .62, x + lean, baseY - flameHeight);
+        ctx.bezierCurveTo(x + lean + tongueWidth * 1.15, baseY - flameHeight * .68, x + tongueWidth * 1.35, baseY - flameHeight * .24, x + tongueWidth, baseY + 1);
         ctx.closePath(); ctx.fill();
       }
       ctx.globalCompositeOperation = 'screen';
@@ -1413,126 +1436,102 @@ class PenaltisGame {
     ctx.restore();
   }
 
-  renderAnimeNet(ctx) {
-    const g = this.goal;
-    const leftAt = depth => g.x + 22 - depth * 15;
-    const rightAt = depth => g.x + g.w - 22 + depth * 15;
-    const topY = g.y + 22;
-    const bottomY = g.y + g.h - 13;
-    const pointAt = (row, col) => {
-      const v = row / this.netRows;
-      const u = col / this.netCols;
-      const node = this.netNodes[row][col];
-      const x = leftAt(v) + (rightAt(v) - leftAt(v)) * u + (u - .5) * node.z * .28;
-      const y = topY + (bottomY - topY) * v + node.z * .5;
-      return { x, y };
+  projectGoal3D(x, y, depth = 0) {
+    const d = Math.max(0, Math.min(2.2, depth));
+    return {
+      x: 200 + (x / 7.32 - .5) * 320 * (1 - d * .04),
+      y: 280 - (y / 2.44) * 170 - d * 5.8
     };
+  }
 
+  drawGoalTube(ctx, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / length, ny = dx / length, radius = 5.8;
+    const midX = (a.x + b.x) * .5;
     ctx.save();
-    // Deep shaded net cavity and side curtains establish the goal's volume.
-    const cavity = ctx.createLinearGradient(0, topY, 0, bottomY);
-    cavity.addColorStop(0, 'rgba(2,10,20,.66)');
-    cavity.addColorStop(.55, 'rgba(3,19,25,.32)');
-    cavity.addColorStop(1, 'rgba(3,13,19,.58)');
-    ctx.fillStyle = cavity;
-    ctx.beginPath();
-    ctx.moveTo(leftAt(0), topY); ctx.lineTo(rightAt(0), topY);
-    ctx.lineTo(rightAt(1), bottomY); ctx.lineTo(leftAt(1), bottomY);
-    ctx.closePath(); ctx.fill();
+    // Cancel the field's horizontal camera expansion locally, keeping each metal tube round.
+    ctx.translate(midX, 0); ctx.scale(1 / 1.5, 1); ctx.translate(-midX, 0);
+    const metal = ctx.createLinearGradient(
+      (a.x + b.x) * .5 - nx * radius, (a.y + b.y) * .5 - ny * radius,
+      (a.x + b.x) * .5 + nx * radius, (a.y + b.y) * .5 + ny * radius);
+    metal.addColorStop(0, '#344750'); metal.addColorStop(.18, '#b9cbd1');
+    metal.addColorStop(.42, '#ffffff'); metal.addColorStop(.62, '#91a7af'); metal.addColorStop(1, '#344750');
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(a.x + 2, a.y + 5); ctx.lineTo(b.x + 2, b.y + 5);
+    ctx.strokeStyle = 'rgba(0,0,0,.68)'; ctx.lineWidth = radius * 2.8; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = metal; ctx.lineWidth = radius * 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a.x + nx * 1.5, a.y + ny * 1.5); ctx.lineTo(b.x + nx * 1.5, b.y + ny * 1.5);
+    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.25; ctx.stroke();
+    ctx.restore();
+  }
 
-    ctx.fillStyle = 'rgba(4,16,24,.38)';
-    ctx.beginPath();
-    ctx.moveTo(g.x + 8, g.y + 9); ctx.lineTo(leftAt(0), topY);
-    ctx.lineTo(leftAt(1), bottomY); ctx.lineTo(g.x + 2, g.y + g.h - 3);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(rightAt(0), topY); ctx.lineTo(g.x + g.w - 8, g.y + 9);
-    ctx.lineTo(g.x + g.w - 2, g.y + g.h - 3); ctx.lineTo(rightAt(1), bottomY);
-    ctx.closePath(); ctx.fill();
+  renderGoalNetPanel(ctx, corners, rows, cols) {
+    const mix = (a, b, t) => a + (b - a) * t;
+    const at = (u, v) => this.projectGoal3D(
+      mix(mix(corners[0][0],corners[1][0],u),mix(corners[3][0],corners[2][0],u),v),
+      mix(mix(corners[0][1],corners[1][1],u),mix(corners[3][1],corners[2][1],u),v),
+      mix(mix(corners[0][2],corners[1][2],u),mix(corners[3][2],corners[2][2],u),v));
+    ctx.save(); ctx.strokeStyle = 'rgba(207,231,236,.5)'; ctx.lineWidth = .72;
+    for (let c=0;c<=cols;c++) { ctx.beginPath(); for(let r=0;r<=rows;r++){const p=at(c/cols,r/rows);if(!r)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);} ctx.stroke(); }
+    for (let r=0;r<=rows;r++) { ctx.beginPath(); for(let c=0;c<=cols;c++){const p=at(c/cols,r/rows);if(!c)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);} ctx.stroke(); }
+    ctx.restore();
+  }
 
-    ctx.lineWidth = .9;
-    for (let col = 0; col <= this.netCols; col++) {
+  renderAnimeNet(ctx) {
+    const pointAt = (r, c) => {
+      const n = this.netNodes[r][c];
+      return this.projectGoal3D(n.x, n.y, n.depth);
+    };
+    const rearTL = this.projectGoal3D(.16, 2.39, 1.8), rearTR = this.projectGoal3D(7.16, 2.39, 1.8);
+    const rearBL = this.projectGoal3D(.16, .04, 1.8), rearBR = this.projectGoal3D(7.16, .04, 1.8);
+    ctx.save();
+    const shade = ctx.createLinearGradient(rearTL.x, rearTL.y, rearBL.x, rearBL.y);
+    shade.addColorStop(0, 'rgba(2,10,19,.76)'); shade.addColorStop(.6, 'rgba(3,19,25,.46)'); shade.addColorStop(1, 'rgba(4,20,17,.32)');
+    ctx.fillStyle = shade; ctx.beginPath(); ctx.moveTo(rearTL.x,rearTL.y); ctx.lineTo(rearTR.x,rearTR.y); ctx.lineTo(rearBR.x,rearBR.y); ctx.lineTo(rearBL.x,rearBL.y); ctx.closePath(); ctx.fill();
+
+    // Deformable 3D back net: each knot carries position, velocity, spring tension and damping.
+    for (let c = 0; c <= this.netCols; c++) {
       ctx.beginPath();
-      for (let row = 0; row <= this.netRows; row++) {
-        const point = pointAt(row, col);
-        if (row === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
-      }
-      ctx.strokeStyle = col % 4 === 0 ? 'rgba(206,244,255,.55)' : 'rgba(151,207,219,.33)';
-      ctx.stroke();
+      for (let r = 0; r <= this.netRows; r++) { const p = pointAt(r,c); if (!r) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
+      ctx.strokeStyle = c % 4 === 0 ? 'rgba(232,247,250,.7)' : 'rgba(175,214,223,.42)'; ctx.lineWidth = c % 4 === 0 ? .9 : .58; ctx.stroke();
     }
-    for (let row = 0; row <= this.netRows; row++) {
+    for (let r = 0; r <= this.netRows; r++) {
       ctx.beginPath();
-      for (let col = 0; col <= this.netCols; col++) {
-        const point = pointAt(row, col);
-        if (col === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
-      }
-      ctx.strokeStyle = row % 3 === 0 ? 'rgba(226,248,255,.48)' : 'rgba(151,207,219,.29)';
-      ctx.stroke();
+      for (let c = 0; c <= this.netCols; c++) { const p = pointAt(r,c); if (!c) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
+      ctx.strokeStyle = r % 2 === 0 ? 'rgba(232,247,250,.6)' : 'rgba(175,214,223,.34)'; ctx.lineWidth = r % 2 === 0 ? .8 : .55; ctx.stroke();
     }
 
-    // Reinforced side cords and rear seam catch the stadium light.
-    ctx.strokeStyle = 'rgba(248,200,96,.5)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(g.x + 8, g.y + 10); ctx.lineTo(leftAt(1), bottomY);
-    ctx.moveTo(g.x + g.w - 8, g.y + 10); ctx.lineTo(rightAt(1), bottomY);
-    ctx.moveTo(leftAt(0), topY); ctx.lineTo(leftAt(1), bottomY);
-    ctx.moveTo(rightAt(0), topY); ctx.lineTo(rightAt(1), bottomY);
-    ctx.stroke();
+    // Roof, floor, and side curtains connect the back mesh to the front frame in real depth.
+    this.renderGoalNetPanel(ctx, [[0,2.44,0],[0,2.39,1.8],[.16,.04,1.8],[0,0,0]], 7, 5);
+    this.renderGoalNetPanel(ctx, [[7.32,2.44,0],[7.32,0,0],[7.16,.04,1.8],[7.16,2.39,1.8]], 7, 5);
+    this.renderGoalNetPanel(ctx, [[0,2.44,0],[7.32,2.44,0],[7.16,2.39,1.8],[.16,2.39,1.8]], 11, 5);
+    this.renderGoalNetPanel(ctx, [[0,0,0],[.16,.04,1.8],[7.16,.04,1.8],[7.32,0,0]], 11, 4);
     ctx.restore();
   }
 
   renderAnimePosts(ctx) {
-    const g = this.goal;
-    const topLeft = { x: g.x + 14, y: g.y + 9 };
-    const topRight = { x: g.x + g.w - 14, y: g.y + 9 };
-    const baseLeft = { x: g.x + 3, y: g.y + g.h - 2 };
-    const baseRight = { x: g.x + g.w - 3, y: g.y + g.h - 2 };
-    const frame = () => {
-      ctx.beginPath();
-      ctx.moveTo(baseLeft.x, baseLeft.y);
-      ctx.lineTo(topLeft.x, topLeft.y);
-      ctx.lineTo(topRight.x, topRight.y);
-      ctx.lineTo(baseRight.x, baseRight.y);
-    };
-
+    const p = (x, y, z = 0) => this.projectGoal3D(x, y, z);
+    const frame = [
+      [p(0,0),p(0,2.44)],[p(0,2.44),p(7.32,2.44)],[p(7.32,2.44),p(7.32,0)],
+      [p(0,2.44),p(.16,2.39,1.8)],[p(7.32,2.44),p(7.16,2.39,1.8)],
+      [p(0,0),p(.16,.04,1.8)],[p(7.32,0),p(7.16,.04,1.8)],
+      [p(.16,.04,1.8),p(.16,2.39,1.8)],[p(.16,2.39,1.8),p(7.16,2.39,1.8)],
+      [p(7.16,2.39,1.8),p(7.16,.04,1.8)],[p(.16,.04,1.8),p(7.16,.04,1.8)]
+    ];
     ctx.save();
-    // Turf shadow, then dark carbon supports behind the enamel tubes.
-    ctx.fillStyle = 'rgba(0,0,0,.5)';
-    ctx.beginPath();
-    ctx.ellipse(g.x + g.w / 2, g.y + g.h - 1, g.w * .53, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.shadowColor = 'rgba(0,0,0,.9)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
-    ctx.strokeStyle = '#020812'; ctx.lineWidth = 19; frame(); ctx.stroke();
-    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-
-    const metal = ctx.createLinearGradient(g.x, g.y, g.x + g.w, g.y + g.h);
-    metal.addColorStop(0, '#738997');
-    metal.addColorStop(.18, '#f8ffff');
-    metal.addColorStop(.38, '#a9c3d0');
-    metal.addColorStop(.55, '#ffffff');
-    metal.addColorStop(.78, '#879eaa');
-    metal.addColorStop(1, '#f4ffff');
-    ctx.strokeStyle = metal; ctx.lineWidth = 14; frame(); ctx.stroke();
-
-    const enamel = ctx.createLinearGradient(0, g.y, 0, g.y + g.h);
-    enamel.addColorStop(0, '#ffffff'); enamel.addColorStop(.45, '#dcebf1'); enamel.addColorStop(1, '#8ca2ad');
-    ctx.strokeStyle = enamel; ctx.lineWidth = 8; frame(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(topLeft.x - 2, topLeft.y - 1); ctx.lineTo(topRight.x + 2, topRight.y - 1);
-    ctx.moveTo(baseLeft.x - 1, baseLeft.y - 2); ctx.lineTo(topLeft.x - 2, topLeft.y + 5);
-    ctx.moveTo(topRight.x + 2, topRight.y + 5); ctx.lineTo(baseRight.x + 1, baseRight.y - 2);
-    ctx.stroke();
-
-    // Small gold joints make the frame read as a built stadium goal.
-    ctx.fillStyle = '#ffd76e'; ctx.shadowColor = '#ffb832'; ctx.shadowBlur = 7;
-    for (const point of [topLeft, topRight]) {
-      ctx.beginPath(); ctx.arc(point.x, point.y + 7, 2.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.56)'; ctx.beginPath(); ctx.ellipse(200, this.goal.y + this.goal.h + 4, 178, 9, 0, 0, Math.PI*2); ctx.fill();
+    // Metal sockets are flush with the grass at every upright support.
+    for (const [x,z] of [[0,0],[7.32,0],[.16,1.8],[7.16,1.8]]) {
+      const foot = p(x,.02,z);
+      ctx.save(); ctx.translate(foot.x,0); ctx.scale(1/1.5,1); ctx.translate(-foot.x,0);
+      ctx.fillStyle = 'rgba(4,13,19,.94)'; ctx.strokeStyle = 'rgba(195,216,221,.9)'; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.ellipse(foot.x,foot.y+1,8+z,3.1,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#dce8eb'; ctx.beginPath(); ctx.arc(foot.x,foot.y,1,0,Math.PI*2); ctx.fill();
+      ctx.restore();
     }
+    for (const [a,b] of frame) this.drawGoalTube(ctx,a,b);
     ctx.restore();
   }
 
