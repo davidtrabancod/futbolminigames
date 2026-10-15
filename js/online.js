@@ -215,7 +215,6 @@ class OnlineArena {
         } else {
           topTen.forEach(entry => this.refs.leaderboardList.append(this.makeLeaderboardRow(entry)));
         }
-        if (this.user && !this.user.isGuest) this.updateRankBadge(this.user);
         return;
       } catch (error) {
         lastError = error;
