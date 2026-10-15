@@ -3052,43 +3052,32 @@ body > footer {
   background-size: 220% 100%;
   animation: onlineStadiumSweep 8s ease-in-out infinite;
 }
-.online-hub__stadium-label,
-.online-hub__stadium-caption {
-  position: relative;
-  z-index: 3;
-  padding: .28rem .55rem;
-  border: 1px solid rgba(255, 222, 165, .3);
-  border-radius: .2rem;
-  background: rgba(3, 10, 17, .68);
-  color: #fff2cf;
-  text-shadow: 0 2px 5px #000;
-  backdrop-filter: blur(3px);
-}
-.online-hub__stadium-label b { color: #ffbd55; }
-.online-hub__stadium-ball {
+.online-hub__stadium-portrait {
   position: absolute;
-  z-index: 3;
-  bottom: 16%;
-  left: calc(50% + 2.5rem);
+  z-index: 2;
+  bottom: -10%;
+  left: 50%;
   width: auto;
-  height: auto;
-  background: none;
-  font-size: 2.3rem;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .8));
-  animation: ballOverGoal 2.4s ease-in-out infinite;
+  height: 110%;
+  max-width: none;
+  object-fit: contain;
+  filter: drop-shadow(0 0 13px color-mix(in srgb, var(--keeper-accent, #ffe45e) 72%, transparent));
+  transform: translateX(-50%);
+  animation: keeperPortraitIdle 3.2s ease-in-out infinite;
+  transition: opacity .22s ease, filter .3s ease;
 }
 @keyframes stadiumWallpaperDrift {
   from { background-position: center, 48% 57%; }
   to { background-position: center, 52% 57%; }
 }
-@keyframes ballOverGoal {
-  0%, 100% { transform: translate(0, 0) rotate(-12deg) scale(.94); }
-  50% { transform: translate(-1.2rem, -1rem) rotate(24deg) scale(1.04); }
+@keyframes keeperPortraitIdle {
+  0%, 100% { margin-bottom: 0; }
+  50% { margin-bottom: 3px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .online-hub__stadium,
   .online-hub__stadium::after,
-  .online-hub__stadium-ball { animation: none; }
+  .online-hub__stadium-portrait { animation: none; }
 }
 .online-hub__play .online-hub__duel-heading h3 { letter-spacing:.045em; }
 .guest-prompt { border-radius:.35rem; border-color:rgba(89,244,208,.24); background:linear-gradient(100deg,rgba(3,14,22,.94),rgba(7,36,39,.8)); }

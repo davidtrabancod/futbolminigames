@@ -44,6 +44,7 @@ class OnlineArena {
       matchmakingBanner: document.getElementById('matchmakingBanner'),
       goalkeeperRoster: document.getElementById('goalkeeperRoster'),
       goalkeeperSelectionStatus: document.getElementById('goalkeeperSelectionStatus'),
+      featuredKeeperPortrait: document.getElementById('featuredKeeperPortrait'),
       rankedMatchBtn: document.getElementById('rankedMatchBtn'),
       rankedActionType: document.getElementById('rankedActionType'),
       createFriendlyBtn: document.getElementById('createFriendlyBtn'),
@@ -284,8 +285,18 @@ class OnlineArena {
     if (!this.matchActive && !this.refs.rankedMatchBtn.disabled) this.setOnlineStatus(isGuest
       ? `Juegas como ${this.user.nickname}. Tus partidas no suman puntos.`
       : this.user ? 'Ya puedes buscar rival y competir por puntos.' : 'Puedes jugar como invitado. Crea una cuenta para sumar puntos.');
+    this.updateFeaturedKeeperPortrait(this.user?.keeperId || 'rookie');
     this.renderGoalkeeperRoster();
     if (this.app.games?.penaltis) this.app.games.penaltis.setOnlineGoalkeeper(this.user?.keeperId || 'rookie');
+  }
+
+  updateFeaturedKeeperPortrait(keeperId) {
+    const portrait = this.refs.featuredKeeperPortrait;
+    const library = window.GOALKEEPER_ROSTER;
+    if (!portrait || !library) return;
+    const keeper = library.byId(keeperId);
+    portrait.style.setProperty('--keeper-accent', keeper.colors[0]);
+    portrait.src = `./assets/keeper-portrait-${keeper.id}.webp`;
   }
 
   renderGoalkeeperRoster() {
