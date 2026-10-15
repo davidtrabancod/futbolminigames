@@ -3027,105 +3027,67 @@ body > footer {
 .online-hub__stadium {
   min-height: 12rem;
   isolation: isolate;
-  border-color: rgba(255, 151, 63, .8);
-  background:
-    radial-gradient(ellipse at 50% 100%, rgba(255, 81, 17, .42), transparent 58%),
-    radial-gradient(ellipse at 50% 35%, rgba(21, 40, 52, .84), transparent 72%),
-    linear-gradient(180deg, #07131d 0%, #121a20 52%, #40180e 100%);
-  box-shadow: inset 0 0 48px rgba(255, 76, 19, .22), 0 0 25px rgba(255, 95, 23, .2);
+  border: 1px solid rgba(255, 179, 91, .62);
+  border-radius: .35rem;
+  background-color: #07121d;
+  background-image:
+    linear-gradient(180deg, rgba(2, 11, 19, .46), rgba(3, 12, 16, .12) 45%, rgba(2, 10, 15, .56)),
+    url('../assets/penalty-stadium-fire.jpg');
+  background-size: cover, 105% auto;
+  background-position: center, center 57%;
+  box-shadow: inset 0 0 32px rgba(2, 9, 15, .55), 0 0 22px rgba(255, 111, 35, .17);
+  animation: stadiumWallpaperDrift 18s ease-in-out infinite alternate;
 }
 .online-hub__stadium::before {
-  inset: 27% 17% 11%;
+  inset: 0;
   z-index: 1;
-  border: 3px solid rgba(237, 249, 255, .88);
-  border-bottom-width: 5px;
-  border-radius: .25rem .25rem 0 0;
-  background:
-    linear-gradient(90deg, transparent 49.5%, rgba(230, 244, 255, .58) 50%, transparent 50.5%),
-    repeating-linear-gradient(0deg, transparent 0 17px, rgba(230, 244, 255, .2) 18px 19px),
-    repeating-linear-gradient(90deg, transparent 0 25px, rgba(230, 244, 255, .18) 26px 27px);
-  box-shadow: 0 0 17px rgba(215, 242, 255, .26), inset 0 0 20px rgba(213, 241, 255, .14);
+  border: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(2, 9, 16, .32), transparent 35% 65%, rgba(2, 9, 16, .32));
   transform: none;
 }
 .online-hub__stadium::after {
-  z-index: 0;
-  background:
-    radial-gradient(ellipse at 12% 100%, rgba(255, 35, 9, .72), transparent 48%),
-    radial-gradient(ellipse at 85% 100%, rgba(255, 115, 12, .68), transparent 50%),
-    linear-gradient(0deg, rgba(255, 78, 9, .3), transparent 65%);
-  animation: arenaHeat 2.4s ease-in-out infinite alternate;
-}
-.online-hub__stadium-flames {
-  position: absolute;
-  inset: 0;
   z-index: 1;
-  overflow: hidden;
-  pointer-events: none;
+  background: linear-gradient(110deg, transparent 25%, rgba(255, 244, 207, .13) 49%, transparent 66%);
+  background-size: 220% 100%;
+  animation: onlineStadiumSweep 8s ease-in-out infinite;
 }
-.online-hub__stadium-flames i {
-  position: absolute;
-  bottom: -27%;
-  width: 15%;
-  height: 76%;
-  transform-origin: 50% 100%;
-  clip-path: polygon(0 100%, 12% 60%, 23% 73%, 33% 31%, 47% 58%, 59% 0, 72% 49%, 85% 35%, 100% 100%);
-  background: linear-gradient(0deg, #fa310d 0%, #ff7114 45%, #ffe165 84%, rgba(255, 238, 158, .1) 100%);
-  filter: drop-shadow(0 0 12px rgba(255, 77, 16, .55));
-  opacity: .62;
-  animation: arenaFlame 1.15s ease-in-out infinite alternate;
-}
-.online-hub__stadium-flames i:nth-child(1) { left: -1%; height: 67%; animation-delay: -.3s; }
-.online-hub__stadium-flames i:nth-child(2) { left: 13%; height: 87%; animation-delay: -.9s; }
-.online-hub__stadium-flames i:nth-child(3) { left: 29%; height: 66%; animation-delay: -.5s; }
-.online-hub__stadium-flames i:nth-child(4) { left: 43%; height: 84%; animation-delay: -.1s; }
-.online-hub__stadium-flames i:nth-child(5) { left: 58%; height: 70%; animation-delay: -.75s; }
-.online-hub__stadium-flames i:nth-child(6) { left: 72%; height: 90%; animation-delay: -.4s; }
-.online-hub__stadium-flames i:nth-child(7) { left: 86%; height: 68%; animation-delay: -.8s; }
 .online-hub__stadium-label,
-.online-hub__stadium-caption { position: relative; z-index: 3; }
-.online-hub__stadium-keeper {
-  position: absolute;
-  z-index: 2;
-  bottom: 10%;
-  left: 50%;
-  color: #fff;
-  font-size: clamp(2.5rem, 7vw, 4rem);
-  line-height: 1;
-  filter: drop-shadow(0 4px 3px #160b09) drop-shadow(0 0 12px rgba(255, 196, 82, .7));
-  transform: translateX(-50%);
-  animation: keeperTension 1.8s ease-in-out infinite;
+.online-hub__stadium-caption {
+  position: relative;
+  z-index: 3;
+  padding: .28rem .55rem;
+  border: 1px solid rgba(255, 222, 165, .3);
+  border-radius: .2rem;
+  background: rgba(3, 10, 17, .68);
+  color: #fff2cf;
+  text-shadow: 0 2px 5px #000;
+  backdrop-filter: blur(3px);
 }
+.online-hub__stadium-label b { color: #ffbd55; }
 .online-hub__stadium-ball {
   position: absolute;
   z-index: 3;
-  bottom: 23%;
-  left: calc(50% + 2.1rem);
+  bottom: 16%;
+  left: calc(50% + 2.5rem);
   width: auto;
   height: auto;
   background: none;
   font-size: 2.3rem;
-  animation: ballOverGoal 2.1s ease-in-out infinite;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .8));
+  animation: ballOverGoal 2.4s ease-in-out infinite;
 }
-@keyframes arenaFlame {
-  from { transform: scaleY(.78) skewX(-3deg); opacity: .46; }
-  to { transform: scaleY(1.08) skewX(4deg); opacity: .82; }
-}
-@keyframes arenaHeat {
-  from { opacity: .55; }
-  to { opacity: .95; }
-}
-@keyframes keeperTension {
-  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-2deg); }
-  50% { transform: translateX(-50%) translateY(-5px) rotate(2deg); }
+@keyframes stadiumWallpaperDrift {
+  from { background-position: center, 48% 57%; }
+  to { background-position: center, 52% 57%; }
 }
 @keyframes ballOverGoal {
-  0%, 100% { transform: translate(0, 0) rotate(-12deg) scale(.92); }
-  50% { transform: translate(-1.4rem, -1.1rem) rotate(28deg) scale(1.08); }
+  0%, 100% { transform: translate(0, 0) rotate(-12deg) scale(.94); }
+  50% { transform: translate(-1.2rem, -1rem) rotate(24deg) scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .online-hub__stadium,
   .online-hub__stadium::after,
-  .online-hub__stadium-flames i,
-  .online-hub__stadium-keeper,
   .online-hub__stadium-ball { animation: none; }
 }
 .online-hub__play .online-hub__duel-heading h3 { letter-spacing:.045em; }
