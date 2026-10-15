@@ -38,11 +38,11 @@ class PenaltisGame {
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 135, icon: '↖️' },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 135, icon: '↗️' },
-      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 205, icon: '🎯' },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 255, icon: '↙️' },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 255, icon: '↘️' }
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 176, icon: '↖️' },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 176, icon: '↗️' },
+      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 242, icon: '🎯' },
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 298, icon: '↙️' },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 298, icon: '↘️' }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -68,7 +68,7 @@ class PenaltisGame {
 
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
-    this.arenaBackground.src = './assets/penalty-stadium-torches.png';
+    this.arenaBackground.src = './assets/penalty-stadium-perspective.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
       x: 20 + Math.random() * 920,
       y: 105 + Math.random() * 180,
@@ -168,7 +168,7 @@ class PenaltisGame {
 
     this.goal = {
       x: 40,
-      y: 110,
+      y: 158,
       w: 320,
       h: 170,
       postWidth: 12
@@ -1440,14 +1440,15 @@ class PenaltisGame {
     const d = Math.max(0, Math.min(2.2, depth));
     return {
       x: 200 + (x / 7.32 - .5) * 320 * (1 - d * .04),
-      y: 280 - (y / 2.44) * 170 - d * 5.8
+      // Las patas delanteras apoyan sobre la línea de gol de la imagen del estadio.
+      y: 328 - (y / 2.44) * 170 - d * 5.8
     };
   }
 
   drawGoalTube(ctx, a, b) {
     const dx = b.x - a.x, dy = b.y - a.y;
     const length = Math.max(1, Math.hypot(dx, dy));
-    const nx = -dy / length, ny = dx / length, radius = 5.8;
+    const nx = -dy / length, ny = dx / length, radius = 3.2;
     const midX = (a.x + b.x) * .5;
     ctx.save();
     // Cancel the field's horizontal camera expansion locally, keeping each metal tube round.
@@ -1459,11 +1460,11 @@ class PenaltisGame {
     metal.addColorStop(.42, '#ffffff'); metal.addColorStop(.62, '#91a7af'); metal.addColorStop(1, '#344750');
     ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(a.x + 2, a.y + 5); ctx.lineTo(b.x + 2, b.y + 5);
-    ctx.strokeStyle = 'rgba(0,0,0,.68)'; ctx.lineWidth = radius * 2.8; ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,.48)'; ctx.lineWidth = radius * 2.3; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     ctx.strokeStyle = metal; ctx.lineWidth = radius * 2; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(a.x + nx * 1.5, a.y + ny * 1.5); ctx.lineTo(b.x + nx * 1.5, b.y + ny * 1.5);
-    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.25; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.58)'; ctx.lineWidth = .8; ctx.stroke();
     ctx.restore();
   }
 
@@ -1521,13 +1522,13 @@ class PenaltisGame {
       [p(7.16,2.39,1.8),p(7.16,.04,1.8)],[p(.16,.04,1.8),p(7.16,.04,1.8)]
     ];
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,.56)'; ctx.beginPath(); ctx.ellipse(200, this.goal.y + this.goal.h + 4, 178, 9, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.beginPath(); ctx.ellipse(200, 328, 178, 7, 0, 0, Math.PI*2); ctx.fill();
     // Metal sockets are flush with the grass at every upright support.
     for (const [x,z] of [[0,0],[7.32,0],[.16,1.8],[7.16,1.8]]) {
       const foot = p(x,.02,z);
       ctx.save(); ctx.translate(foot.x,0); ctx.scale(1/1.5,1); ctx.translate(-foot.x,0);
       ctx.fillStyle = 'rgba(4,13,19,.94)'; ctx.strokeStyle = 'rgba(195,216,221,.9)'; ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.ellipse(foot.x,foot.y+1,8+z,3.1,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(foot.x,foot.y+1,5+z*.5,2,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
       ctx.fillStyle='#dce8eb'; ctx.beginPath(); ctx.arc(foot.x,foot.y,1,0,Math.PI*2); ctx.fill();
       ctx.restore();
     }
