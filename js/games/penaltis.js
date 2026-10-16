@@ -146,7 +146,11 @@ class PenaltisGame {
     this.netRows = 16;
     this.netNodes = [];
 
-    const netLeft = .12, netRight = 7.2, netBottom = .06, netTop = 2.38;
+    // The animated back panel is anchored to the rear frame of the goal.
+    // Keeping its rest depth here makes the ball deform real netting instead
+    // of a loose grid floating across the mouth of the goal.
+    const netLeft = .16, netRight = 7.16, netBottom = .08, netTop = 2.36;
+    const netRestDepth = 1.8;
     for (let r = 0; r <= this.netRows; r++) {
       this.netNodes[r] = [];
       for (let c = 0; c <= this.netCols; c++) {
@@ -159,7 +163,8 @@ class PenaltisGame {
           origY: y,
           x,
           y,
-          depth: 0,
+          depth: netRestDepth,
+          origDepth: netRestDepth,
           vx: 0,
           vy: 0,
           vz: 0
@@ -782,13 +787,13 @@ class PenaltisGame {
         const neighborDepth = (left.depth + right.depth + up.depth + down.depth) * .25;
         node.vx += ((node.origX - node.x) * stiffness + (neighborX - node.x) * 9) * dt;
         node.vy += ((node.origY - node.y) * stiffness + (neighborY - node.y) * 9) * dt;
-        node.vz += ((-node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
+        node.vz += ((node.origDepth - node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
         const damping = Math.exp(-5.2 * dt);
         node.vx *= damping; node.vy *= damping; node.vz *= damping;
         node.x += node.vx * dt; node.y += node.vy * dt; node.depth += node.vz * dt;
         if (Math.abs(node.x - node.origX) < .0008 && Math.abs(node.vx) < .012) node.x = node.origX, node.vx = 0;
         if (Math.abs(node.y - node.origY) < .0008 && Math.abs(node.vy) < .012) node.y = node.origY, node.vy = 0;
-        if (Math.abs(node.depth) < .0008 && Math.abs(node.vz) < .012) node.depth = 0, node.vz = 0;
+        if (Math.abs(node.depth - node.origDepth) < .0008 && Math.abs(node.vz) < .012) node.depth = node.origDepth, node.vz = 0;
       }
     }
 

@@ -160,7 +160,9 @@ class Goal3DRenderer {
   }
 
   buildNet(nodes) {
-    const out = [], color = [0.72, 0.88, 0.91, 0.56];
+    // Braided nylon is intentionally brighter and more opaque than the old
+    // pale overlay so the rear wall reads as a real net against the stadium.
+    const out = [], color = [0.66, 0.79, 0.81, 0.82];
     const line = (a, b) => {
       const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
       const length = Math.hypot(dx, dy, dz) || 1;
@@ -188,6 +190,24 @@ class Goal3DRenderer {
     for (let i = 0; i <= rows; i++) {
       const y = bottom + (top - bottom) * i / rows;
       line([-half, y, 0], [-half, y, rear]); line([half, y, 0], [half, y, rear]);
+    }
+    // Fill the roof, floor and side curtains with their own woven grids.
+    // These depthwise panels make the net a closed, box-shaped volume rather
+    // than a single flat lattice drawn over the goal mouth.
+    for (let d = 1; d < 6; d++) {
+      const z = rear * d / 6;
+      for (let i = 0; i < cols; i++) {
+        const x0 = -half + (2 * half * i / cols);
+        const x1 = -half + (2 * half * (i + 1) / cols);
+        line([x0, top, z], [x1, top, z]);
+        line([x0, bottom, z], [x1, bottom, z]);
+      }
+      for (let i = 0; i < rows; i++) {
+        const y0 = bottom + (top - bottom) * i / rows;
+        const y1 = bottom + (top - bottom) * (i + 1) / rows;
+        line([-half, y0, z], [-half, y1, z]);
+        line([half, y0, z], [half, y1, z]);
+      }
     }
     for (let i = 0; i <= cols; i++) {
       const x = -half + (2 * half * i / cols);
