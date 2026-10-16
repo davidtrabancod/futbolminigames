@@ -68,7 +68,7 @@ class PenaltisGame {
 
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
-    this.arenaBackground.src = './assets/penalty-stadium-perspective.png';
+    this.arenaBackground.src = './assets/penalty-stadium-integrated-goal.png';
     this.fireSprite = new Image();
     this.fireSprite.src = './assets/brazier-flame-sprite.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
@@ -140,18 +140,20 @@ class PenaltisGame {
     this.netRows = 16;
     this.netNodes = [];
 
-    const gx = 40, gy = 110, gw = 320, gh = 170;
+    const netLeft = .12, netRight = 7.2, netBottom = .06, netTop = 2.38;
     for (let r = 0; r <= this.netRows; r++) {
       this.netNodes[r] = [];
       for (let c = 0; c <= this.netCols; c++) {
         const u = c / this.netCols;
         const v = r / this.netRows;
+        const x = netLeft + u * (netRight - netLeft);
+        const y = netBottom + (1 - v) * (netTop - netBottom);
         this.netNodes[r][c] = {
-          origX: u * 7.32,
-          origY: (1 - v) * 2.44,
-          x: u * 7.32,
-          y: (1 - v) * 2.44,
-          depth: 1.8,
+          origX: x,
+          origY: y,
+          x,
+          y,
+          depth: 0,
           vx: 0,
           vy: 0,
           vz: 0
@@ -170,9 +172,9 @@ class PenaltisGame {
 
     this.goal = {
       x: 40,
-      y: 158,
+      y: 150,
       w: 320,
-      h: 170,
+      h: 178,
       postWidth: 12
     };
 
@@ -774,13 +776,13 @@ class PenaltisGame {
         const neighborDepth = (left.depth + right.depth + up.depth + down.depth) * .25;
         node.vx += ((node.origX - node.x) * stiffness + (neighborX - node.x) * 9) * dt;
         node.vy += ((node.origY - node.y) * stiffness + (neighborY - node.y) * 9) * dt;
-        node.vz += ((1.8 - node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
+        node.vz += ((-node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
         const damping = Math.exp(-5.2 * dt);
         node.vx *= damping; node.vy *= damping; node.vz *= damping;
         node.x += node.vx * dt; node.y += node.vy * dt; node.depth += node.vz * dt;
         if (Math.abs(node.x - node.origX) < .0008 && Math.abs(node.vx) < .012) node.x = node.origX, node.vx = 0;
         if (Math.abs(node.y - node.origY) < .0008 && Math.abs(node.vy) < .012) node.y = node.origY, node.vy = 0;
-        if (Math.abs(node.depth - 1.8) < .0008 && Math.abs(node.vz) < .012) node.depth = 1.8, node.vz = 0;
+        if (Math.abs(node.depth) < .0008 && Math.abs(node.vz) < .012) node.depth = 0, node.vz = 0;
       }
     }
 
@@ -1004,8 +1006,8 @@ class PenaltisGame {
     }
 
     this.renderPenaltyPitchDetails(ctx);
-    this.renderAnimeNet(ctx);
     this.renderAnimePosts(ctx);
+    this.renderAnimeNet(ctx);
 
     if (this.state === 'aiming') {
       this.renderAnimeTargetDials(ctx);
@@ -1447,9 +1449,9 @@ class PenaltisGame {
   projectGoal3D(x, y, depth = 0) {
     const d = Math.max(0, Math.min(2.2, depth));
     return {
-      x: 200 + (x / 7.32 - .5) * 320 * (1 - d * .02),
-      // Las patas delanteras apoyan sobre la línea de gol de la imagen del estadio.
-      y: 328 - (y / 2.44) * 170 - d * 3.8
+      // The 3D cage is calibrated to the goal posts baked into the stadium plate.
+      x: 198.5 + (x / 7.32 - .5) * 322 * (1 - d * .02),
+      y: 328 - (y / 2.44) * 178 - d * 3.8
     };
   }
 
@@ -1519,7 +1521,7 @@ class PenaltisGame {
       mix(mix(corners[0][0],corners[1][0],u),mix(corners[3][0],corners[2][0],u),v),
       mix(mix(corners[0][1],corners[1][1],u),mix(corners[3][1],corners[2][1],u),v),
       mix(mix(corners[0][2],corners[1][2],u),mix(corners[3][2],corners[2][2],u),v));
-    ctx.save(); ctx.strokeStyle = 'rgba(207,231,236,.5)'; ctx.lineWidth = .72;
+    ctx.save(); ctx.strokeStyle = 'rgba(207,231,236,.25)'; ctx.lineWidth = .55;
     for (let c=0;c<=cols;c++) { ctx.beginPath(); for(let r=0;r<=rows;r++){const p=at(c/cols,r/rows);if(!r)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);} ctx.stroke(); }
     for (let r=0;r<=rows;r++) { ctx.beginPath(); for(let c=0;c<=cols;c++){const p=at(c/cols,r/rows);if(!c)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);} ctx.stroke(); }
     ctx.restore();
@@ -1530,30 +1532,25 @@ class PenaltisGame {
       const n = this.netNodes[r][c];
       return this.projectGoal3D(n.x, n.y, n.depth);
     };
-    const rearTL = this.projectGoal3D(.16, 2.39, 1.8), rearTR = this.projectGoal3D(7.16, 2.39, 1.8);
-    const rearBL = this.projectGoal3D(.16, .04, 1.8), rearBR = this.projectGoal3D(7.16, .04, 1.8);
     ctx.save();
-    const shade = ctx.createLinearGradient(rearTL.x, rearTL.y, rearBL.x, rearBL.y);
-    shade.addColorStop(0, 'rgba(2,10,19,.76)'); shade.addColorStop(.6, 'rgba(3,19,25,.46)'); shade.addColorStop(1, 'rgba(4,20,17,.32)');
-    ctx.fillStyle = shade; ctx.beginPath(); ctx.moveTo(rearTL.x,rearTL.y); ctx.lineTo(rearTR.x,rearTR.y); ctx.lineTo(rearBR.x,rearBR.y); ctx.lineTo(rearBL.x,rearBL.y); ctx.closePath(); ctx.fill();
 
-    // Deformable 3D back net: each knot carries position, velocity, spring tension and damping.
-    for (let c = 0; c <= this.netCols; c += 2) {
+    // This deformable net starts directly behind the integrated photo frame (z=0).
+    for (let c = 0; c <= this.netCols; c++) {
       ctx.beginPath();
       for (let r = 0; r <= this.netRows; r++) { const p = pointAt(r,c); if (!r) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
-      ctx.strokeStyle = 'rgba(218,237,241,.34)'; ctx.lineWidth = .68; ctx.stroke();
+      ctx.strokeStyle = 'rgba(219,235,232,.3)'; ctx.lineWidth = .52; ctx.stroke();
     }
-    for (let r = 0; r <= this.netRows; r += 2) {
+    for (let r = 0; r <= this.netRows; r++) {
       ctx.beginPath();
       for (let c = 0; c <= this.netCols; c++) { const p = pointAt(r,c); if (!c) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
-      ctx.strokeStyle = 'rgba(218,237,241,.3)'; ctx.lineWidth = .62; ctx.stroke();
+      ctx.strokeStyle = 'rgba(219,235,232,.26)'; ctx.lineWidth = .48; ctx.stroke();
     }
 
     // Roof, floor, and side curtains connect the back mesh to the front frame in real depth.
-    this.renderGoalNetPanel(ctx, [[0,2.44,0],[0,2.39,1.8],[.16,.04,1.8],[0,0,0]], 7, 5);
-    this.renderGoalNetPanel(ctx, [[7.32,2.44,0],[7.32,0,0],[7.16,.04,1.8],[7.16,2.39,1.8]], 7, 5);
-    this.renderGoalNetPanel(ctx, [[0,2.44,0],[7.32,2.44,0],[7.16,2.39,1.8],[.16,2.39,1.8]], 11, 5);
-    this.renderGoalNetPanel(ctx, [[0,0,0],[.16,.04,1.8],[7.16,.04,1.8],[7.32,0,0]], 11, 4);
+    this.renderGoalNetPanel(ctx, [[.12,2.38,0],[.12,2.36,1.8],[.16,.08,1.8],[.12,.06,0]], 7, 5);
+    this.renderGoalNetPanel(ctx, [[7.2,2.38,0],[7.2,.06,0],[7.16,.08,1.8],[7.16,2.36,1.8]], 7, 5);
+    this.renderGoalNetPanel(ctx, [[.12,2.38,0],[7.2,2.38,0],[7.16,2.36,1.8],[.16,2.36,1.8]], 11, 5);
+    this.renderGoalNetPanel(ctx, [[.12,.06,0],[.16,.08,1.8],[7.16,.08,1.8],[7.2,.06,0]], 11, 4);
     ctx.restore();
   }
 
@@ -1564,22 +1561,10 @@ class PenaltisGame {
       [p(0,0),p(.16,.04,1.8)],[p(0,2.44),p(.16,2.39,1.8)],
       [p(7.32,0),p(7.16,.04,1.8)],[p(7.32,2.44),p(7.16,2.39,1.8)]
     ];
-    const frontFrame = [p(0,0),p(0,2.44),p(7.32,2.44),p(7.32,0)];
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.beginPath(); ctx.ellipse(200, 328, 178, 7, 0, 0, Math.PI*2); ctx.fill();
-    // Metal sockets are flush with the grass at every upright support.
-    for (const [x,z] of [[0,0],[7.32,0],[.16,1.8],[7.16,1.8]]) {
-      const foot = p(x,.02,z);
-      ctx.save(); ctx.translate(foot.x,0); ctx.scale(1/1.5,1); ctx.translate(-foot.x,0);
-      ctx.fillStyle = 'rgba(4,13,19,.94)'; ctx.strokeStyle = 'rgba(195,216,221,.9)'; ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.ellipse(foot.x,foot.y+1,5+z*.5,2,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='#dce8eb'; ctx.beginPath(); ctx.arc(foot.x,foot.y,1,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
-    // Draw the rear cage and its four depth braces first; the front U-frame caps every join.
+    // The front posts and shadows are baked into the stadium plate; only draw the cage behind them.
     this.drawGoalFramePath(ctx, rearFrame, 3.4);
     for (const [a,b] of depthBraces) this.drawGoalTube(ctx,a,b);
-    this.drawGoalFramePath(ctx, frontFrame, 4.1);
     ctx.restore();
   }
 
