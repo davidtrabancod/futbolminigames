@@ -52,6 +52,12 @@ class PenaltisGame {
 
     this.initNetMesh();
     this.initArenaAtmosphere();
+    try {
+      this.goal3D = new window.Goal3DRenderer(this.vWidth, this.vHeight);
+    } catch (error) {
+      console.warn('No se pudo iniciar el modelo 3D de la portería:', error);
+      this.goal3D = null;
+    }
 
     this.auraParticles = [];
     this.speedLines = [];
@@ -68,7 +74,7 @@ class PenaltisGame {
 
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
-    this.arenaBackground.src = './assets/penalty-stadium-integrated-goal.png';
+    this.arenaBackground.src = './assets/penalty-stadium-perspective.png';
     this.fireSprite = new Image();
     this.fireSprite.src = './assets/brazier-flame-sprite.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
@@ -1006,8 +1012,19 @@ class PenaltisGame {
     }
 
     this.renderPenaltyPitchDetails(ctx);
-    this.renderAnimePosts(ctx);
-    this.renderAnimeNet(ctx);
+    if (this.goal3D) {
+      try {
+        this.goal3D.draw(this.netNodes);
+        ctx.drawImage(this.goal3D.canvas, 0, 0, this.vWidth, this.vHeight);
+      } catch (error) {
+        console.warn('Se perdió el contexto 3D de la portería:', error);
+        this.goal3D = null;
+      }
+    }
+    if (!this.goal3D) {
+      this.renderAnimePosts(ctx);
+      this.renderAnimeNet(ctx);
+    }
 
     if (this.state === 'aiming') {
       this.renderAnimeTargetDials(ctx);
@@ -1556,13 +1573,19 @@ class PenaltisGame {
 
   renderAnimePosts(ctx) {
     const p = (x, y, z = 0) => this.projectGoal3D(x, y, z);
+    const frontFrame = [p(0,0),p(0,2.44),p(7.32,2.44),p(7.32,0)];
     const rearFrame = [p(.16,.04,1.8),p(.16,2.39,1.8),p(7.16,2.39,1.8),p(7.16,.04,1.8),p(.16,.04,1.8)];
     const depthBraces = [
       [p(0,0),p(.16,.04,1.8)],[p(0,2.44),p(.16,2.39,1.8)],
       [p(7.32,0),p(7.16,.04,1.8)],[p(7.32,2.44),p(7.16,2.39,1.8)]
     ];
     ctx.save();
-    // The front posts and shadows are baked into the stadium plate; only draw the cage behind them.
+    // Canvas fallback for browsers without WebGL: draw a complete front frame.
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    for (const x of [p(0,0).x, p(7.32,0).x]) {
+      ctx.beginPath(); ctx.ellipse(x, 328, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    this.drawGoalFramePath(ctx, frontFrame, 6.5);
     this.drawGoalFramePath(ctx, rearFrame, 3.4);
     for (const [a,b] of depthBraces) this.drawGoalTube(ctx,a,b);
     ctx.restore();
