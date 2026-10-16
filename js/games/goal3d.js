@@ -53,9 +53,9 @@ class Goal3DRenderer {
         vec3 n = normalize(vNormal);
         vec3 lightA = normalize(vec3(-0.45, 0.85, 0.7));
         vec3 lightB = normalize(vec3(0.65, 0.35, 0.6));
-        float diffuse = max(dot(n, lightA), 0.0) * 0.56 + max(dot(n, lightB), 0.0) * 0.24;
-        float specular = pow(max(dot(reflect(-lightA, n), vec3(0.0, 0.15, 1.0)), 0.0), 24.0) * 0.32;
-        float stadiumGlow = 0.12 + 0.12 * max(n.y, 0.0);
+        float diffuse = max(dot(n, lightA), 0.0) * 0.46 + max(dot(n, lightB), 0.0) * 0.20;
+        float specular = pow(max(dot(reflect(-lightA, n), vec3(0.0, 0.15, 1.0)), 0.0), 36.0) * 0.12;
+        float stadiumGlow = 0.34 + 0.10 * max(n.y, 0.0);
         gl_FragColor = vec4(vColor.rgb * (stadiumGlow + diffuse) + specular * vColor.a,
                             vColor.a);
       }
@@ -111,34 +111,31 @@ class Goal3DRenderer {
   }
 
   buildFrame() {
-    const bright = [0.88, 0.94, 0.96, 1];
-    const shadow = [0.16, 0.23, 0.27, 1];
-    const trim = [0.47, 0.61, 0.66, 1];
+    const bright = [0.94, 0.96, 0.93, 1];
+    const shadow = [0.22, 0.27, 0.26, 1];
+    const trim = [0.62, 0.69, 0.66, 1];
     const front = 0, back = -1.9, half = 3.66, top = 2.44;
     const add = (a, b, r, c) => this.tube(this.frameData, a, b, r, c, 16);
 
     // The front assembly is a single joined U frame, with real circular sections.
-    add([-half, 0.02, front], [-half, top, front], 0.072, bright);
-    add([-half, top, front], [half, top, front], 0.072, bright);
-    add([half, top, front], [half, 0.02, front], 0.072, bright);
+    add([-half, 0.02, front], [-half, top, front], 0.055, bright);
+    add([-half, top, front], [half, top, front], 0.055, bright);
+    add([half, top, front], [half, 0.02, front], 0.055, bright);
 
     // Rear cage and depth rails make the goal a braced 3D structure planted on the pitch.
-    add([-half, 0.02, back], [-half, top, back], 0.052, trim);
-    add([-half, top, back], [half, top, back], 0.052, trim);
-    add([half, top, back], [half, 0.02, back], 0.052, trim);
-    add([-half, 0.02, front], [-half, 0.02, back], 0.06, bright);
-    add([half, 0.02, front], [half, 0.02, back], 0.06, bright);
-    add([-half, top, front], [-half, top, back], 0.06, bright);
-    add([half, top, front], [half, top, back], 0.06, bright);
-    add([-half, 0.02, back], [half, 0.02, back], 0.045, shadow);
+    add([-half, 0.02, back], [-half, top, back], 0.038, trim);
+    add([-half, top, back], [half, top, back], 0.038, trim);
+    add([half, top, back], [half, 0.02, back], 0.038, trim);
+    add([-half, 0.02, front], [-half, 0.02, back], 0.046, bright);
+    add([half, 0.02, front], [half, 0.02, back], 0.046, bright);
+    add([-half, top, front], [-half, top, back], 0.046, bright);
+    add([half, top, front], [half, top, back], 0.046, bright);
+    add([-half, 0.02, back], [half, 0.02, back], 0.035, shadow);
 
     // Dark ground shoes and spherical corner sleeves visually join the rails.
     for (const x of [-half, half]) {
-      add([x, 0.025, 0.12], [x, 0.025, -0.42], 0.095, shadow);
-      this.sphere(this.frameData, [x, 0.02, 0], 0.09, bright);
-      this.sphere(this.frameData, [x, top, 0], 0.085, bright);
-      this.sphere(this.frameData, [x, top, back], 0.063, trim);
-      this.sphere(this.frameData, [x, 0.02, back], 0.06, trim);
+      // Small ground shoes replace the oversized ball joints from the first model.
+      add([x, 0.025, 0.08], [x, 0.025, -0.22], 0.052, shadow);
     }
   }
 
@@ -162,7 +159,7 @@ class Goal3DRenderer {
   buildNet(nodes) {
     // Braided nylon is intentionally brighter and more opaque than the old
     // pale overlay so the rear wall reads as a real net against the stadium.
-    const out = [], color = [0.66, 0.79, 0.81, 0.82];
+    const out = [], color = [0.78, 0.85, 0.80, 0.58];
     const line = (a, b) => {
       const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
       const length = Math.hypot(dx, dy, dz) || 1;
