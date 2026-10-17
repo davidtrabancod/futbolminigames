@@ -577,10 +577,11 @@ class OnlineArena {
     // Force a clean animation when a second match starts quickly.
     void intro.offsetWidth;
     intro.classList.add('is-active');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.matchIntroTimer = window.setTimeout(() => {
       intro.classList.add('is-revealing');
-      this.matchIntroTimer = window.setTimeout(() => this.clearMatchIntro(), 680);
-    }, 1100);
+      this.matchIntroTimer = window.setTimeout(() => this.clearMatchIntro(), reducedMotion ? 80 : 1020);
+    }, reducedMotion ? 40 : 1600);
   }
 
   clearMatchIntro() {
