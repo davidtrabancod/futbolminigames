@@ -1248,7 +1248,13 @@ class PenaltisGame {
       this.keeper.state = 'beaten';
       const physics = this.ball.physicsState;
       this.bulgeNet(this.ball.targetX, this.ball.targetY, physics);
-      this.spawnCelebrationFlares();
+      if (turnRole === 'shooter') {
+        this.spawnCelebrationFlares();
+      } else {
+        // A rival goal must not inherit the tail of the player's celebration.
+        this.goalFlares.length = 0;
+        this.goalFlareSparks.length = 0;
+      }
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
       window.soundManager.playNetSwish();
@@ -1370,15 +1376,15 @@ class PenaltisGame {
 
   spawnCelebrationFlares() {
     const colors = ['#ff3b30', '#ffd60a', '#4de3ff', '#b7ff4a', '#ff4fd8', '#ffffff'];
-    const launchX = [105, 255, 405, 555, 705, 855];
+    const launchX = [65, 155, 245, 335, 425, 515, 605, 695, 785, 875];
     for (let i = 0; i < launchX.length; i++) {
-      const x = launchX[i] + (Math.random() - .5) * 24;
-      const targetY = 62 + Math.random() * 70;
-      const duration = .78 + Math.random() * .25;
+      const x = launchX[i] + (Math.random() - .5) * 30;
+      const targetY = 38 + Math.random() * 92;
+      const duration = .88 + Math.random() * .34;
       this.goalFlares.push({
         x, y: this.app.virtualHeight * .516 + 4,
         startX: x, startY: this.app.virtualHeight * .516 + 4,
-        targetY, age: -i * .075, duration,
+        targetY, age: -i * .045, duration,
         hue: colors[i], trail: []
       });
     }
@@ -1398,15 +1404,15 @@ class PenaltisGame {
         if (flare.trail[t].life <= 0) flare.trail.splice(t, 1);
       }
       if (progress >= 1) {
-        for (let spark = 0; spark < 24; spark++) {
+        for (let spark = 0; spark < 38; spark++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 28 + Math.random() * 90;
+          const speed = 34 + Math.random() * 112;
           this.goalFlareSparks.push({
             x: flare.x, y: flare.y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            age: 0, life: .48 + Math.random() * .42,
-            size: 1 + Math.random() * 2.2, hue: flare.hue
+            age: 0, life: .62 + Math.random() * .55,
+            size: 1.4 + Math.random() * 2.8, hue: flare.hue
           });
         }
         this.goalFlares.splice(i, 1);
@@ -1432,24 +1438,24 @@ class PenaltisGame {
         ctx.globalAlpha = point.life / .24 * .65;
         ctx.fillStyle = flare.hue;
         ctx.shadowColor = flare.hue;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 17;
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 2.2, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#fff';
       ctx.shadowColor = flare.hue;
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 30;
       ctx.beginPath();
-      ctx.arc(flare.x, flare.y, 3.2, 0, Math.PI * 2);
+      ctx.arc(flare.x, flare.y, 4.8, 0, Math.PI * 2);
       ctx.fill();
     }
     for (const spark of this.goalFlareSparks) {
       ctx.globalAlpha = Math.max(0, 1 - spark.age / spark.life);
       ctx.fillStyle = spark.hue;
       ctx.shadowColor = spark.hue;
-      ctx.shadowBlur = 9;
+      ctx.shadowBlur = 13;
       ctx.beginPath();
       ctx.arc(spark.x, spark.y, spark.size, 0, Math.PI * 2);
       ctx.fill();
