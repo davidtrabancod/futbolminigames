@@ -38,11 +38,11 @@ class PenaltisGame {
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 176, icon: '↖️' },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 176, icon: '↗️' },
-      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 242, icon: '🎯' },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 298, icon: '↙️' },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 298, icon: '↘️' }
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 189, icon: '↖️' },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 189, icon: '↗️' },
+      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 262, icon: '🎯' },
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 322, icon: '↙️' },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 322, icon: '↘️' }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -183,20 +183,20 @@ class PenaltisGame {
 
     this.goal = {
       x: 40,
-      y: 150,
+      y: 163,
       w: 320,
-      h: 178,
+      h: 191,
       postWidth: 12
     };
 
     const lvl = this.currentLevel;
     this.keeper = {
       x: 200,
-      y: 230,
+      y: 314,
       baseX: 200,
-      baseY: 230,
+      baseY: 314,
       targetX: 200,
-      targetY: 230,
+      targetY: 314,
       rotation: 0,
       diving: false,
       state: 'idle',
@@ -207,7 +207,7 @@ class PenaltisGame {
       recovering: false,
       diveDirection: 0,
       diveStartX: 200,
-      diveStartY: 230,
+      diveStartY: 314,
       anticipating: false,
       diveSpeed: lvl.diveSpeed,
       reactionDelay: lvl.reactionDelay,
@@ -1470,10 +1470,11 @@ class PenaltisGame {
 
   projectGoal3D(x, y, depth = 0) {
     const d = Math.max(0, Math.min(2.2, depth));
+    const perspective = 1 / (1 + d / 26.6);
     return {
-      // The 3D cage is calibrated to the goal posts baked into the stadium plate.
-      x: 198.5 + (x / 7.32 - .5) * 322 * (1 - d * .02),
-      y: 328 - (y / 2.44) * 178 - d * 3.8
+      // Same field vanishing point and goal-line calibration as Goal3DRenderer.
+      x: 200 + (x / 7.32 - .5) * 322 * perspective,
+      y: 297 + (354.5 - (y / 2.44) * 191 - 297) * perspective
     };
   }
 
