@@ -701,6 +701,10 @@ class OnlineArena {
   }
 
   beginMatch(message) {
+    if (this.pendingOnlineResultTimer) {
+      window.clearTimeout(this.pendingOnlineResultTimer);
+      this.pendingOnlineResultTimer = null;
+    }
     this.setMatchmakingLoading(false);
     if (message.matchId) this.matchId = message.matchId;
     this.currentMode = message.mode;
@@ -887,6 +891,27 @@ class OnlineArena {
   }
 
   showOnlineResult(message) {
+    const penaltyGame = this.app.games?.penaltis;
+    const ball = penaltyGame?.ball;
+    if (penaltyGame?.isOnlineMode && ball && (ball.inFlight || ball.inNet || ball.isDeflected)) {
+      if (this.pendingOnlineResultTimer) window.clearTimeout(this.pendingOnlineResultTimer);
+      const remainingFlight = ball.inFlight
+        ? Math.max(0, (ball.flightTime || .52) - (ball.physicsState?.time || 0))
+        : 0;
+      const remainingImpact = ball.inNet
+        ? Math.max(0, 1.25 - (ball.netAge || 0))
+        : ball.isDeflected ? Math.max(0, .9 - (ball.deflectAge || 0)) : 0;
+      const delay = Math.max(600, (remainingFlight + remainingImpact) * 1000 + 280);
+      this.pendingOnlineResultTimer = window.setTimeout(() => {
+        this.pendingOnlineResultTimer = null;
+        this.showOnlineResult(message);
+      }, delay);
+      return;
+    }
+    if (this.pendingOnlineResultTimer) {
+      window.clearTimeout(this.pendingOnlineResultTimer);
+      this.pendingOnlineResultTimer = null;
+    }
     this.stopMatchPolling();
     this.matchActive = false;
     this.currentRole = null;

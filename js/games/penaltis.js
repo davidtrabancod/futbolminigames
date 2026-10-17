@@ -385,186 +385,164 @@ class PenaltisGame {
 
   renderOnlineScoreboardOverlay(ctx) {
     ctx.save();
-    
-    const boxX = 198;
-    const boxY = 8;
-    const boxW = 564;
-    const boxH = 70;
-    
-    // Sombra exterior profunda 3D (NO TOCAR)
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 16;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 6;
-
-    // Gradiente metálico/futurista de fondo estilo HUD (NO TOCAR)
-    const bgGrad = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH);
-    bgGrad.addColorStop(0, '#090d16');
-    bgGrad.addColorStop(0.5, '#1e1b4b');
-    bgGrad.addColorStop(1, '#090d16');
-    ctx.fillStyle = bgGrad;
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 12);
-    ctx.fill();
-    
-    ctx.shadowBlur = 0;
-
-    // Borde exterior con pulso de neón (NO TOCAR)
-    const pulse = Math.sin(this.timer * 6) * 0.3 + 0.7;
-    ctx.strokeStyle = `rgba(56, 189, 248, ${0.5 + pulse * 0.5})`;
-    ctx.lineWidth = 2.5;
-    ctx.strokeRect(boxX, boxY, boxW, boxH);
-
-    // Líneas divisorias (NO TOCAR)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(boxX + 10, boxY + 28);
-    ctx.lineTo(boxX + boxW - 10, boxY + 28);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(boxX + boxW / 2, boxY + 30);
-    ctx.lineTo(boxX + boxW / 2, boxY + boxH - 6);
-    ctx.stroke();
-
-    const myName = (this.onlineMyName || 'Tú').toUpperCase();
-    const oppName = (this.onlineOppName || 'Rival').toUpperCase();
-    const myScore = this.onlineMyScore !== undefined ? this.onlineMyScore : 0;
-    const oppScore = this.onlineOppScore !== undefined ? this.onlineOppScore : 0;
-
-    // ==========================================
-    // PISO SUPERIOR: DESTELLO POR DEBAJO + NOMBRES
-    // ==========================================
-    const sweepProgress = ((this.timer * 0.7) % 3.0) / 3.0;
-    const sweepX = boxX + 14 + (boxW - 28) * sweepProgress;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(boxX + 10, boxY + 4, boxW - 20, 22);
-    ctx.clip();
-
-    ctx.globalCompositeOperation = 'lighter';
-
-    const shimmer = ctx.createLinearGradient(sweepX - 25, 0, sweepX + 25, 0);
-    shimmer.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    shimmer.addColorStop(0.5, 'rgba(251, 255, 0, 0.24)');
-    shimmer.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-    ctx.fillStyle = shimmer;
-    ctx.fillRect(boxX + 10, boxY + 4, boxW - 20, 22);
-    ctx.restore();
-
-    ctx.font = '900 9px "Press Start 2P", monospace';
-    ctx.textBaseline = 'middle';
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'left';
-    ctx.fillText(myName, boxX + 14, boxY + 15);
-
-    ctx.fillStyle = '#f87171';
-    ctx.textAlign = 'right';
-    ctx.fillText(oppName, boxX + boxW - 14, boxY + 15);
-
-    ctx.fillStyle = '#facc15';
-    ctx.shadowColor = '#facc15';
-    ctx.shadowBlur = 8;
-    ctx.font = '900 10px "Press Start 2P", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('VS', boxX + boxW / 2, boxY + 15);
-    ctx.shadowBlur = 0;
-
-    // ==========================================
-    // PISO INFERIOR: PUNTUACIÓN Y PENALTIS (MÁXIMO 4 CÍRCULOS: 3 NORMALES + 1 EXTRA DE MUERTE SÚBITA)
-    // ==========================================
-    const infY = boxY + 51;
-
-    // --- LADO IZQUIERDO (TÚ) ---
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = '#38bdf8';
-    ctx.shadowBlur = 8;
-    ctx.font = '900 50px Fredoka, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(myScore, boxX + (boxW / 2) - 18, infY);
-    ctx.shadowBlur = 0;
-
+    const boxX = 168, boxY = 8, boxW = 624, boxH = 74;
+    const centerX = boxX + boxW / 2;
+    const myName = (this.onlineMyName || 'T?').toUpperCase();
+    const oppName = (this.onlineOppName || 'RIVAL').toUpperCase();
+    const myScore = this.onlineMyScore ?? 0;
+    const oppScore = this.onlineOppScore ?? 0;
     const myHistory = this.onlineMyHistory || [];
     const oppHistory = this.onlineOppHistory || [];
-    
-    // Condición exacta: Ambos han lanzado al menos 3 veces, hay empate global y las puntuaciones coinciden
-    const isSuddenDeathActive = (myHistory.length >= 3 && oppHistory.length >= 3 && myScore === oppScore) || myHistory.length > 3 || oppHistory.length > 3;
-    const myTotalCircles = isSuddenDeathActive ? 4 : 3;
-    
-    for (let i = 0; i < myTotalCircles; i++) {
-      const cx = (boxX + 22) + i * 19;
-      const cy = infY;
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, 6.0, 0, Math.PI * 2);
-      
-      if (myHistory[i] === 'goal') {
-        ctx.fillStyle = '#22c55e';
-        ctx.shadowColor = '#22c55e';
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      } else if (myHistory[i] === 'saved') {
-        ctx.fillStyle = '#ef4444';
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      } else {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)'; // Vacío y listo para el desempate
-        ctx.fill();
-      }
-      ctx.strokeStyle = i >= 3 ? '#facc15' : 'rgba(255, 255, 255, 0.35)';
-      ctx.lineWidth = i >= 3 ? 1.8 : 1.2;
-      ctx.stroke();
-    }
+    const suddenDeath = this.onlineMyShotsTotal > 3 || this.onlineOppShotsTotal > 3
+      || (myHistory.length >= 3 && oppHistory.length >= 3 && myScore === oppScore);
+    const pulse = .5 + .5 * Math.sin(this.timer * 3.2);
 
-    // --- LADO DERECHO (RIVAL) ---
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = '#f87171';
-    ctx.shadowBlur = 8;
-    ctx.font = '900 50px Fredoka, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(oppScore, boxX + (boxW / 2) + 18, infY);
+    // Deep glass panel, layered edge light and a traveling polished highlight.
+    ctx.shadowColor = 'rgba(25, 226, 238, .56)';
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 5;
+    const background = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH);
+    background.addColorStop(0, 'rgba(10, 25, 39, .98)');
+    background.addColorStop(.48, 'rgba(11, 17, 35, .98)');
+    background.addColorStop(1, 'rgba(4, 11, 20, .98)');
+    ctx.fillStyle = background;
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 15);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.strokeStyle = 'rgba(86, 244, 255, ' + (.52 + pulse * .3) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 15);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(boxX + 4, boxY + 4, boxW - 8, boxH - 8, 12);
+    ctx.stroke();
+
+    // Team-colored light rails frame the two score columns.
+    const rail = (x, color, direction) => {
+      const gradient = ctx.createLinearGradient(x, 0, x + direction * 150, 0);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x, boxY + 7, 150, 2);
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, boxY + 7, 34, 2);
+      ctx.restore();
+    };
+    rail(boxX + 8, '#32dcff', 1);
+    rail(boxX + boxW - 8, '#ff658b', -1);
+
+    const sweepX = boxX + 20 + ((this.timer * .32) % 1) * (boxW - 40);
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(boxX + 5, boxY + 4, boxW - 10, boxH - 8, 12);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    const sweep = ctx.createLinearGradient(sweepX - 30, boxY, sweepX + 30, boxY);
+    sweep.addColorStop(0, 'rgba(255,255,255,0)');
+    sweep.addColorStop(.5, 'rgba(185,248,255,.12)');
+    sweep.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sweep;
+    ctx.fillRect(boxX + 5, boxY + 4, boxW - 10, boxH - 8);
+    ctx.restore();
+
+    // Center seam and illuminated VS jewel.
+    ctx.strokeStyle = 'rgba(255,255,255,.13)';
+    ctx.beginPath();
+    ctx.moveTo(centerX, boxY + 13);
+    ctx.lineTo(centerX, boxY + boxH - 9);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(6, 22, 32, .96)';
+    ctx.strokeStyle = 'rgba(255, 214, 102, .78)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(centerX, boxY + 24, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowColor = '#ffd866';
+    ctx.shadowBlur = 9;
+    ctx.fillStyle = '#ffe68a';
+    ctx.font = '900 9px Fredoka, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VS', centerX, boxY + 24);
     ctx.shadowBlur = 0;
 
-    const oppTotalCircles = isSuddenDeathActive ? 4 : 3;
+    // Player names and large score digits.
+    ctx.font = '800 10px Fredoka, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8deeff';
+    ctx.shadowColor = '#20cfff';
+    ctx.shadowBlur = 8;
+    ctx.fillText(myName, boxX + 190, boxY + 20, 210);
+    ctx.fillStyle = '#ffadbd';
+    ctx.shadowColor = '#ff4e77';
+    ctx.fillText(oppName, boxX + boxW - 190, boxY + 20, 210);
+    ctx.shadowBlur = 0;
 
-    for (let i = 0; i < oppTotalCircles; i++) {
-      const cx = (boxX + boxW - 22) - i * 19;
-      const cy = infY;
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, 6.0, 0, Math.PI * 2);
-      
-      if (oppHistory[i] === 'goal') {
-        ctx.fillStyle = '#22c55e';
-        ctx.shadowColor = '#22c55e';
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      } else if (oppHistory[i] === 'saved') {
-        ctx.fillStyle = '#ef4444';
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      } else {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)'; // Vacío y listo para el desempate
-        ctx.fill();
+    const drawScore = (score, x, color, pulseStart) => {
+      let scale = 1;
+      if (pulseStart !== undefined) {
+        const age = this.timer - pulseStart;
+        if (age >= 0 && age < .55) scale += Math.sin((1 - age / .55) * Math.PI) * .2;
       }
-      ctx.strokeStyle = i >= 3 ? '#facc15' : 'rgba(255, 255, 255, 0.35)';
-      ctx.lineWidth = i >= 3 ? 1.8 : 1.2;
-      ctx.stroke();
-    }
+      ctx.save();
+      ctx.translate(x, boxY + 50);
+      ctx.scale(scale, scale);
+      ctx.font = '900 43px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0, 0, 0, .7)';
+      ctx.strokeText(String(score), 0, 0);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 18 + pulse * 5;
+      ctx.fillStyle = '#f4fbff';
+      ctx.fillText(String(score), 0, 0);
+      ctx.restore();
+    };
+    if (this._scoreboardMyScore !== undefined && this._scoreboardMyScore !== myScore) this._scorePulseMy = this.timer;
+    if (this._scoreboardOppScore !== undefined && this._scoreboardOppScore !== oppScore) this._scorePulseOpp = this.timer;
+    this._scoreboardMyScore = myScore;
+    this._scoreboardOppScore = oppScore;
+    drawScore(myScore, boxX + 190, '#25d9ff', this._scorePulseMy);
+    drawScore(oppScore, boxX + boxW - 190, '#ff5478', this._scorePulseOpp);
 
+    // Attempt lights; the sudden-death attempt has a gold rim.
+    const drawAttempts = (history, startX, direction) => {
+      const count = suddenDeath ? 4 : 3;
+      for (let i = 0; i < count; i++) {
+        const x = startX + direction * i * 18;
+        const y = boxY + 65;
+        const result = history[i];
+        const color = result === 'goal' ? '#4cff9b' : result === 'saved' ? '#ff526e' : '#78909b';
+        ctx.save();
+        ctx.shadowColor = result ? color : 'transparent';
+        ctx.shadowBlur = result ? 9 : 0;
+        ctx.fillStyle = result ? color : 'rgba(214,241,248,.1)';
+        ctx.strokeStyle = i === 3 ? '#ffd866' : result ? color : 'rgba(208,236,242,.42)';
+        ctx.lineWidth = i === 3 ? 1.8 : 1.2;
+        ctx.beginPath();
+        ctx.arc(x, y, i === 3 ? 5.6 : 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    drawAttempts(myHistory, boxX + 28, 1);
+    drawAttempts(oppHistory, boxX + boxW - 28, -1);
     ctx.restore();
   }
-  
+
   handlePointerDown(x, y) {
     if (this.state !== 'aiming') return;
     x = this.toSceneX(x);
@@ -1282,6 +1260,7 @@ class PenaltisGame {
       });
     }
 
+    const finalShotHold = this.shotsTaken >= this.maxShots ? 2700 : 1900;
     setTimeout(() => {
       this.camera.targetZoom = 1.0;
       if (this.shotsTaken >= this.maxShots) {
@@ -1289,7 +1268,7 @@ class PenaltisGame {
       } else {
         this.resetNextShot();
       }
-    }, 1900);
+    }, finalShotHold);
   }
 
   triggerAnimeGoal() {
@@ -1527,20 +1506,90 @@ class PenaltisGame {
   }
 
   renderOnlineRoleBanner(ctx) {
+    const isShooter = this.onlineRole === 'lanzador';
+    const accent = isShooter ? '#ffd84d' : '#54ddff';
+    const x = 365, y = 86, w = 230, h = 32;
+    const midY = y + h / 2;
     ctx.save();
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
-    ctx.fillRect(390, 78, 180, 25);
-    ctx.strokeStyle = this.onlineRole === 'lanzador' ? '#facc15' : '#38bdf8';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(390, 78, 180, 25);
 
-    ctx.fillStyle = this.onlineRole === 'lanzador' ? '#facc15' : '#38bdf8';
-    ctx.font = '900 14px Fredoka, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 17;
+    const panel = ctx.createLinearGradient(x, y, x, y + h);
+    panel.addColorStop(0, 'rgba(14, 28, 43, .98)');
+    panel.addColorStop(1, 'rgba(4, 12, 22, .98)');
+    ctx.fillStyle = panel;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 12);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = .8;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Icon medallion: target reticle for the shooter, shield for the keeper.
+    ctx.fillStyle = 'rgba(255,255,255,.07)';
+    ctx.beginPath();
+    ctx.arc(x + 23, midY, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 7;
+    if (isShooter) {
+      ctx.beginPath();
+      ctx.arc(x + 23, midY, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x + 23, midY, 2, 0, Math.PI * 2);
+      ctx.fillStyle = accent;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + 23, midY - 10); ctx.lineTo(x + 23, midY - 8);
+      ctx.moveTo(x + 23, midY + 8); ctx.lineTo(x + 23, midY + 10);
+      ctx.moveTo(x + 13, midY); ctx.lineTo(x + 15, midY);
+      ctx.moveTo(x + 31, midY); ctx.lineTo(x + 33, midY);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x + 23, midY - 9);
+      ctx.lineTo(x + 31, midY - 6);
+      ctx.lineTo(x + 30, midY + 2);
+      ctx.quadraticCurveTo(x + 28, midY + 8, x + 23, midY + 10);
+      ctx.quadraticCurveTo(x + 18, midY + 8, x + 16, midY + 2);
+      ctx.lineTo(x + 15, midY - 6);
+      ctx.closePath();
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = .22;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + 19, midY); ctx.lineTo(x + 22, midY + 3);
+      ctx.lineTo(x + 27, midY - 3);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    
-    const text = this.onlineRole === 'lanzador' ? '🎯 TURNO: LANZADOR' : '🧤 TURNO: PORTERO';
-    ctx.fillText(text, 480, 90);
+    ctx.fillStyle = 'rgba(220,240,248,.72)';
+    ctx.font = '700 8px Fredoka, sans-serif';
+    ctx.fillText('TU TURNO', x + 47, y + 9);
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 9;
+    ctx.font = '900 14px Fredoka, sans-serif';
+    ctx.fillText(isShooter ? 'LANZADOR' : 'PORTERO', x + 47, y + 21);
+    ctx.shadowBlur = 0;
+
+    // A small animated charge bar tracks the pulse without competing with the score.
+    const charge = (Math.sin(this.timer * 3.4) + 1) * .5;
+    ctx.globalAlpha = .35 + charge * .5;
+    ctx.fillStyle = accent;
+    ctx.fillRect(x + w - 5, y + 8, 2, h - 16);
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
