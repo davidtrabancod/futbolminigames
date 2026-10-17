@@ -309,6 +309,7 @@ class PenaltisGame {
       flightVY: 0,
       isDeflected: false,
       deflectAge: 0,
+      contactHold: 0,
       velocityX: 0,
       velocityY: 0,
       inNet: false,
@@ -650,6 +651,7 @@ class PenaltisGame {
     this.camera.targetZoom = 1.0;
     this.camera.shake = 0;
     this.ball.isDeflected = false;
+    this.ball.contactHold = 0;
     this.ball.physicsAccumulator = 0;
     this.ball.netAccumulator = 0;
     this.ball.deflectAccumulator = 0;
@@ -859,7 +861,7 @@ class PenaltisGame {
 
     if (this.state === 'aiming') {
       this.keeper.idleTimer += dt;
-      if (this.keeper.recovering) {
+      if (this.keeper.recovering && this.keeper.catchContactTimer <= 0) {
         this.keeper.landingTimer += dt;
         const recovery = Math.min(1, this.keeper.landingTimer / .58);
         this.keeper.x += (this.keeper.baseX - this.keeper.x) * Math.min(1, dt * 5);
@@ -1000,23 +1002,27 @@ class PenaltisGame {
 
     if (this.ball.isDeflected) {
       const ball = this.ball;
-      ball.deflectAccumulator = Math.min(.1, ball.deflectAccumulator + dt);
-      const step = 1 / 120;
-      while (ball.deflectAccumulator >= step) {
-        ball.deflectAge += step;
-        ball.velocityY += 640 * step;
-        ball.x += ball.velocityX * step;
-        ball.y += ball.velocityY * step;
-        ball.velocityX *= Math.exp(-1.8 * step);
-        ball.rotation += step * ball.spin * 1.5;
-        ball.spin *= Math.exp(-.9 * step);
-        ball.deflectAccumulator -= step;
+      if (ball.contactHold > 0) {
+        ball.contactHold = Math.max(0, ball.contactHold - dt);
+      } else {
+        ball.deflectAccumulator = Math.min(.1, ball.deflectAccumulator + dt);
+        const step = 1 / 120;
+        while (ball.deflectAccumulator >= step) {
+          ball.deflectAge += step;
+          ball.velocityY += 640 * step;
+          ball.x += ball.velocityX * step;
+          ball.y += ball.velocityY * step;
+          ball.velocityX *= Math.exp(-1.8 * step);
+          ball.rotation += step * ball.spin * 1.5;
+          ball.spin *= Math.exp(-.9 * step);
+          ball.deflectAccumulator -= step;
+        }
+        ball.scale = Math.min(1, .71 + ball.deflectAge * .28);
+        if (ball.deflectAge > .9 || ball.y > 410) ball.isDeflected = false;
       }
-      ball.scale = Math.min(1, .71 + ball.deflectAge * .28);
-      if (ball.deflectAge > .9 || ball.y > 410) ball.isDeflected = false;
     }
 
-    if (this.isOnlineMode && !this.ball.inFlight && ['saved', 'beaten'].includes(this.keeper.state)) {
+    if (this.isOnlineMode && this.keeper.catchContactTimer <= 0 && !this.ball.inFlight && ['saved', 'beaten'].includes(this.keeper.state)) {
       this.keeper.recovering = true;
       if (this.state !== 'aiming') this.keeper.landingTimer += dt;
       if (this.keeper.landingTimer > .58) {
@@ -1247,6 +1253,9 @@ class PenaltisGame {
   deflectBallFromKeeper() {
     this.ball.isDeflected = true;
     this.ball.deflectAge = 0;
+    // Keep the ball pinned to the keeper's palms for several rendered frames
+    // so the impact reads clearly before the rebound begins.
+    this.ball.contactHold = .095;
     this.ball.velocityX = this.keeper.diveDirection * 62 + this.ball.flightVX * .08;
     this.ball.velocityY = Math.max(70, this.ball.flightVY * .06);
   }

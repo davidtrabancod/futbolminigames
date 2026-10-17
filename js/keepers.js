@@ -36,9 +36,9 @@
     const idlePhase = time * [1.2, 2.7, 1.1, .8, 1.9, 1.35, 1.05, .9][p.artIndex];
     const breath = Math.sin(idlePhase);
     const diveFrame = direction < 0 ? 2 : direction > 0 ? 3 : 1;
-    // Dive poses reach about 113px sideways and 72px upward from the sprite
-    // center in source-image pixels. Shift the body along that reach vector so the leading glove meets
-    // the shot's actual destination instead of stopping beside the ball.
+    // The dive sprite's leading palm is at approximately (+/-113, -72) in
+    // source pixels relative to its center. Align that palm with the ball's
+    // center throughout the save pose, rather than aligning the torso.
     let contactOffsetX = 0, contactOffsetY = 0;
     if (diving && ballContact && direction) {
       const gloveX = x + direction * 113 * spriteScale;

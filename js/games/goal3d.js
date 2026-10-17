@@ -3,9 +3,13 @@ class Goal3DRenderer {
   constructor(width = 400, height = 600) {
     this.width = width;
     this.height = height;
+    // Render the small, fast-moving ball above the game's logical resolution.
+    // The game canvas is enlarged for display; a 3x WebGL buffer prevents its
+    // leather panels and silhouette from turning into blocky pixels.
+    this.pixelRatio = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
     this.canvas = document.createElement('canvas');
-    this.canvas.width = width;
-    this.canvas.height = height;
+    this.canvas.width = Math.round(width * this.pixelRatio);
+    this.canvas.height = Math.round(height * this.pixelRatio);
     this.gl = this.canvas.getContext('webgl', {
       alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true
     });
@@ -449,7 +453,7 @@ class Football3DRenderer {
 
   draw(ball) {
     const gl = this.gl;
-    gl.viewport(0, 0, this.width, this.height);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
