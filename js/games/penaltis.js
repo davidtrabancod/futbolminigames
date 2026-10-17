@@ -1375,7 +1375,7 @@ class PenaltisGame {
   }
 
   spawnCelebrationFlares() {
-    const colors = ['#ff3b30', '#ffd60a', '#4de3ff', '#b7ff4a', '#ff4fd8', '#ffffff'];
+    const fireColors = ['#ff4d0a', '#ff7314', '#ff9f1c', '#ffc247', '#ffe0a0'];
     const launchX = [65, 155, 245, 335, 425, 515, 605, 695, 785, 875];
     for (let i = 0; i < launchX.length; i++) {
       const x = launchX[i] + (Math.random() - .5) * 30;
@@ -1385,7 +1385,8 @@ class PenaltisGame {
         x, y: this.app.virtualHeight * .516 + 4,
         startX: x, startY: this.app.virtualHeight * .516 + 4,
         targetY, age: -i * .045, duration,
-        hue: colors[i], trail: []
+        phase: Math.random() * Math.PI * 2,
+        hue: fireColors[i % fireColors.length], trail: []
       });
     }
   }
@@ -1396,9 +1397,10 @@ class PenaltisGame {
       flare.age += dt;
       if (flare.age < 0) continue;
       const progress = Math.min(1, flare.age / flare.duration);
-      flare.x = flare.startX + Math.sin(progress * Math.PI * 2 + i) * 10 * progress;
-      flare.y = flare.startY + (flare.targetY - flare.startY) * progress;
-      flare.trail.push({ x: flare.x, y: flare.y, life: .24 });
+      const rise = 1 - Math.pow(1 - progress, 1.35);
+      flare.x = flare.startX + Math.sin(flare.age * 7 + flare.phase) * (2 + progress * 4);
+      flare.y = flare.startY + (flare.targetY - flare.startY) * rise;
+      flare.trail.push({ x: flare.x, y: flare.y + 8, life: .42, size: 3 + Math.random() * 2.5 });
       for (let t = flare.trail.length - 1; t >= 0; t--) {
         flare.trail[t].life -= dt;
         if (flare.trail[t].life <= 0) flare.trail.splice(t, 1);
@@ -1407,12 +1409,13 @@ class PenaltisGame {
         for (let spark = 0; spark < 38; spark++) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 34 + Math.random() * 112;
+          const sparkColor = ['#ff4d0a', '#ff8a12', '#ffc247', '#fff0bd'][Math.floor(Math.random() * 4)];
           this.goalFlareSparks.push({
             x: flare.x, y: flare.y,
             vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
+            vy: Math.sin(angle) * speed - 24,
             age: 0, life: .62 + Math.random() * .55,
-            size: 1.4 + Math.random() * 2.8, hue: flare.hue
+            size: 1.2 + Math.random() * 2.4, hue: sparkColor
           });
         }
         this.goalFlares.splice(i, 1);
@@ -1423,7 +1426,7 @@ class PenaltisGame {
       spark.age += dt;
       spark.x += spark.vx * dt;
       spark.y += spark.vy * dt;
-      spark.vy += 70 * dt;
+      spark.vy += 105 * dt;
       if (spark.age >= spark.life) this.goalFlareSparks.splice(i, 1);
     }
   }
@@ -1435,20 +1438,43 @@ class PenaltisGame {
     for (const flare of this.goalFlares) {
       if (flare.age < 0) continue;
       for (const point of flare.trail) {
-        ctx.globalAlpha = point.life / .24 * .65;
-        ctx.fillStyle = flare.hue;
-        ctx.shadowColor = flare.hue;
-        ctx.shadowBlur = 17;
+        const strength = point.life / .42;
+        const ember = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, point.size * 2.6);
+        ember.addColorStop(0, `rgba(255,246,205,${strength})`);
+        ember.addColorStop(.2, `rgba(255,174,48,${strength * .95})`);
+        ember.addColorStop(.62, `rgba(255,75,8,${strength * .48})`);
+        ember.addColorStop(1, 'rgba(120,18,0,0)');
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = ember;
+        ctx.shadowColor = '#ff7a13';
+        ctx.shadowBlur = 9;
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+        ctx.ellipse(point.x, point.y, point.size * .72, point.size * 1.7, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // A tapered, flickering flame wraps the hot flare head instead of a
+      // colored bead, with a white-yellow core and a translucent orange tail.
+      const flameHeight = 32 + Math.sin(flare.age * 34 + flare.phase) * 6;
+      const flameWidth = 6.5 + Math.sin(flare.age * 25 + flare.phase * 2) * 1.2;
+      const flame = ctx.createLinearGradient(flare.x, flare.y - 4, flare.x, flare.y + flameHeight);
+      flame.addColorStop(0, 'rgba(255,255,224,.98)');
+      flame.addColorStop(.18, 'rgba(255,218,107,.98)');
+      flame.addColorStop(.48, 'rgba(255,130,16,.94)');
+      flame.addColorStop(1, 'rgba(220,38,0,0)');
       ctx.globalAlpha = 1;
-      ctx.fillStyle = '#fff';
-      ctx.shadowColor = flare.hue;
-      ctx.shadowBlur = 30;
+      ctx.fillStyle = flame;
+      ctx.shadowColor = '#ff7414';
+      ctx.shadowBlur = 24;
       ctx.beginPath();
-      ctx.arc(flare.x, flare.y, 4.8, 0, Math.PI * 2);
+      ctx.moveTo(flare.x, flare.y - 5);
+      ctx.bezierCurveTo(flare.x - flameWidth * 1.5, flare.y + 2, flare.x - flameWidth, flare.y + flameHeight * .72, flare.x, flare.y + flameHeight);
+      ctx.bezierCurveTo(flare.x + flameWidth * 1.1, flare.y + flameHeight * .67, flare.x + flameWidth * 1.35, flare.y + 2, flare.x, flare.y - 5);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,248,210,.96)';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.ellipse(flare.x, flare.y, 3, 6, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     for (const spark of this.goalFlareSparks) {
