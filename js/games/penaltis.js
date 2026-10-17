@@ -62,6 +62,8 @@ class PenaltisGame {
     this.auraParticles = [];
     this.speedLines = [];
     this.ballFireTrail = [];
+    this.goalFlares = [];
+    this.goalFlareSparks = [];
 
     this.camera = {
       zoom: 1.0,
@@ -281,6 +283,8 @@ class PenaltisGame {
     this.auraParticles = [];
     this.speedLines = [];
     this.ballFireTrail = [];
+    this.goalFlares = [];
+    this.goalFlareSparks = [];
     this.initNetMesh();
 
     this.timer = 0;
@@ -585,7 +589,9 @@ class PenaltisGame {
     }
 
     this.spawnMangaSpeedLines();
-    this.camera.targetZoom = 1.12;
+    // Keep the stadium and goal locked in place during the shot.
+    this.camera.targetZoom = 1.0;
+    this.camera.shake = 0;
 
     const lvl = this.currentLevel;
     if (!keeperChoiceId) {
@@ -654,6 +660,8 @@ class PenaltisGame {
       ember.vy -= 9 * dt;
       if (ember.age >= ember.life) this.fireEmbers.splice(i, 1);
     }
+
+    this.updateGoalFlares(dt);
 
     if (this.state === 'aiming') {
       this.keeper.idleTimer += dt;
@@ -861,8 +869,7 @@ class PenaltisGame {
       this.ball.y = this.ball.selectedZone.y;
     }
     this.ball.scale = 0.6;
-    this.camera.shake = isGoal ? 22 : 14;
-    
+    this.camera.shake = 0;
     this.camera.targetZoom = 1.0;
 
     if (isGoal) {
@@ -873,16 +880,13 @@ class PenaltisGame {
       this.ball.result = 'goal';
       this.keeper.state = 'beaten';
       this.bulgeNet(this.ball.targetX, this.ball.targetY, 50);
+      this.spawnCelebrationFlares();
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
       window.soundManager.playNetSwish();
       window.soundManager.playGoal();
       window.soundManager.playCrowdCheer();
 
-      if (window.confettiEngine && window.confettiEngine.burst) {
-        window.confettiEngine.burst(this.ball.targetX, this.ball.targetY, 95);
-      }
-      this.spawnMangaSpeedLines();
     } else {
       this.ball.result = 'saved';
       this.keeper.state = 'saved';
@@ -892,18 +896,12 @@ class PenaltisGame {
       window.soundManager.playCrowdGroan();
     }
 
-    if (turnRole === 'shooter') {
-      if (isGoal) {
-        this.triggerFeedbackText('GOOOOOL! ⚽🔥', '¡Imparable al fondo de la red!', '#facc15');
-      } else {
-        this.triggerFeedbackText('oooh... 💨', 'El portero adivinó tu disparo', '#f87171');
-      }
-    } else if (turnRole === 'goalkeeper') {
-      if (isGoal) {
-        this.triggerFeedbackText('Gol del rival... ⚽', '¡Ajustó demasiado el lanzamiento!', '#fb923c');
-      } else {
-        this.triggerFeedbackText('¡PARADÓN! 🧤⚡', '¡Reflejos magistrales bajo palos!', '#38bdf8');
-      }
+    if (!isGoal && turnRole === 'shooter') {
+      this.triggerFeedbackText('oooh... 💨', 'El portero adivinó tu disparo', '#f87171');
+    } else if (!isGoal && turnRole === 'goalkeeper') {
+      this.triggerFeedbackText('¡PARADÓN! 🧤⚡', '¡Reflejos magistrales bajo palos!', '#38bdf8');
+    } else if (isGoal) {
+      this.feedbackAlpha = 0;
     }
   }
 
@@ -920,7 +918,7 @@ class PenaltisGame {
       this.keeper.state = 'saved';
       this.streak = 0;
       this.history.push('saved');
-      this.camera.shake = 14;
+      this.camera.shake = 0;
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
       window.soundManager.playCatch();
@@ -931,7 +929,7 @@ class PenaltisGame {
       this.score += 100 + this.streak * 25;
       this.streak++;
       this.history.push('goal');
-      this.triggerAnimeGoal('¡GOOOL! ⚽🔥', '¡Buen lanzamiento, directo a la red!', 100);
+      this.triggerAnimeGoal();
     }
 
     if (this.app && this.app.updateHUD) {
@@ -955,7 +953,7 @@ class PenaltisGame {
     }, 1900);
   }
 
-  triggerAnimeGoal(title, subtitle, pts) {
+  triggerAnimeGoal() {
     this.ball.inNet = true;
     this.ball.netAge = 0;
     this.ball.velocityX = (this.ball.startX - this.ball.targetX) * .34;
@@ -963,20 +961,105 @@ class PenaltisGame {
     this.ball.result = 'goal';
     this.keeper.state = 'beaten';
 
-    this.camera.shake = 22;
+    this.camera.shake = 0;
     this.bulgeNet(this.ball.targetX, this.ball.targetY, 50);
+    this.spawnCelebrationFlares();
 
     if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
     window.soundManager.playNetSwish();
     window.soundManager.playGoal();
     window.soundManager.playCrowdCheer();
 
-    if (window.confettiEngine && window.confettiEngine.burst) {
-      window.confettiEngine.burst(this.ball.targetX, this.ball.targetY, 95);
-    }
-    this.spawnMangaSpeedLines();
+    this.feedbackAlpha = 0;
+  }
 
-    this.triggerFeedbackText(title, subtitle, '#facc15');
+  spawnCelebrationFlares() {
+    const colors = ['#ff3b30', '#ffd60a', '#4de3ff', '#b7ff4a', '#ff4fd8', '#ffffff'];
+    const launchX = [105, 255, 405, 555, 705, 855];
+    for (let i = 0; i < launchX.length; i++) {
+      const x = launchX[i] + (Math.random() - .5) * 24;
+      const targetY = 62 + Math.random() * 70;
+      const duration = .78 + Math.random() * .25;
+      this.goalFlares.push({
+        x, y: this.app.virtualHeight * .516 + 4,
+        startX: x, startY: this.app.virtualHeight * .516 + 4,
+        targetY, age: -i * .075, duration,
+        hue: colors[i], trail: []
+      });
+    }
+  }
+
+  updateGoalFlares(dt) {
+    for (let i = this.goalFlares.length - 1; i >= 0; i--) {
+      const flare = this.goalFlares[i];
+      flare.age += dt;
+      if (flare.age < 0) continue;
+      const progress = Math.min(1, flare.age / flare.duration);
+      flare.x = flare.startX + Math.sin(progress * Math.PI * 2 + i) * 10 * progress;
+      flare.y = flare.startY + (flare.targetY - flare.startY) * progress;
+      flare.trail.push({ x: flare.x, y: flare.y, life: .24 });
+      for (let t = flare.trail.length - 1; t >= 0; t--) {
+        flare.trail[t].life -= dt;
+        if (flare.trail[t].life <= 0) flare.trail.splice(t, 1);
+      }
+      if (progress >= 1) {
+        for (let spark = 0; spark < 24; spark++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 28 + Math.random() * 90;
+          this.goalFlareSparks.push({
+            x: flare.x, y: flare.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            age: 0, life: .48 + Math.random() * .42,
+            size: 1 + Math.random() * 2.2, hue: flare.hue
+          });
+        }
+        this.goalFlares.splice(i, 1);
+      }
+    }
+    for (let i = this.goalFlareSparks.length - 1; i >= 0; i--) {
+      const spark = this.goalFlareSparks[i];
+      spark.age += dt;
+      spark.x += spark.vx * dt;
+      spark.y += spark.vy * dt;
+      spark.vy += 70 * dt;
+      if (spark.age >= spark.life) this.goalFlareSparks.splice(i, 1);
+    }
+  }
+
+  renderGoalFlares(ctx) {
+    if (!this.goalFlares.length && !this.goalFlareSparks.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const flare of this.goalFlares) {
+      if (flare.age < 0) continue;
+      for (const point of flare.trail) {
+        ctx.globalAlpha = point.life / .24 * .65;
+        ctx.fillStyle = flare.hue;
+        ctx.shadowColor = flare.hue;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = flare.hue;
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(flare.x, flare.y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const spark of this.goalFlareSparks) {
+      ctx.globalAlpha = Math.max(0, 1 - spark.age / spark.life);
+      ctx.fillStyle = spark.hue;
+      ctx.shadowColor = spark.hue;
+      ctx.shadowBlur = 9;
+      ctx.beginPath();
+      ctx.arc(spark.x, spark.y, spark.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   triggerFeedbackText(title, subtitle, color) {
@@ -1034,15 +1117,6 @@ class PenaltisGame {
     const sceneOffsetX = (this.app.virtualWidth - this.vWidth * sceneScaleX) / 2;
     ctx.translate(sceneOffsetX, 0);
     ctx.scale(sceneScaleX, 1);
-    if (this.camera.shake > 0) {
-      ctx.translate((Math.random() - 0.5) * this.camera.shake, (Math.random() - 0.5) * this.camera.shake);
-    }
-    if (this.camera.zoom !== 1.0) {
-      ctx.translate(200, 300);
-      ctx.scale(this.camera.zoom, this.camera.zoom);
-      ctx.translate(-200, -300);
-    }
-
     this.renderPenaltyPitchDetails(ctx);
     if (this.goal3D) {
       try {
@@ -1157,6 +1231,8 @@ class PenaltisGame {
 
     // The pyrotechnics are anchored to the stadium towers in the background plate.
     this.renderFireEffects(ctx);
+    // Render behind the opaque LED boards so the rockets emerge from behind them.
+    this.renderGoalFlares(ctx);
 
     // Thousands of tiny crowd reflections pulse as an arena-wide wave.
     ctx.save();
