@@ -3,13 +3,9 @@ class Goal3DRenderer {
   constructor(width = 400, height = 600) {
     this.width = width;
     this.height = height;
-    // Render the small, fast-moving ball above the game's logical resolution.
-    // The game canvas is enlarged for display; a 3x WebGL buffer prevents its
-    // leather panels and silhouette from turning into blocky pixels.
-    this.pixelRatio = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
     this.canvas = document.createElement('canvas');
-    this.canvas.width = Math.round(width * this.pixelRatio);
-    this.canvas.height = Math.round(height * this.pixelRatio);
+    this.canvas.width = width;
+    this.canvas.height = height;
     this.gl = this.canvas.getContext('webgl', {
       alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true
     });
@@ -276,9 +272,12 @@ class Football3DRenderer {
   constructor(width = 400, height = 600) {
     this.width = width;
     this.height = height;
+    // Supersample the small, fast-moving ball before compositing it into the
+    // game's logical canvas, so its silhouette and panels stay crisp.
+    this.pixelRatio = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
     this.canvas = document.createElement('canvas');
-    this.canvas.width = width;
-    this.canvas.height = height;
+    this.canvas.width = Math.round(width * this.pixelRatio);
+    this.canvas.height = Math.round(height * this.pixelRatio);
     this.gl = this.canvas.getContext('webgl', {
       alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true
     });
