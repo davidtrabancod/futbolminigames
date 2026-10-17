@@ -43,7 +43,8 @@ class PenaltisGame {
     this.netDepth = 1.88;
     this.netPerspective = 1 / (1 + this.netDepth / 26.6);
     this.netGroundY = 287 + (310 - 287) * this.netPerspective;
-    this.keeperRecoveryDuration = 1.2;
+    this.keeperResultHold = .65;
+    this.shotResetDuration = .32;
     const targetOnNet = (worldX, worldY) => ({
       x: 200 + (worldX - 3.66) * this.goalPixelsPerMeterX * this.netPerspective,
       y: this.netGroundY - worldY * this.goalPixelsPerMeterY * this.netPerspective
@@ -157,9 +158,18 @@ class PenaltisGame {
       this.pendingOnlineTurn = turnMessage;
       return;
     }
+    if (this.keeper.recovering || this.resetTransition) {
+      this.pendingOnlineTurn = turnMessage;
+      if (this.keeper.recovering && this.keeper.landingTimer >= this.keeperResultHold) {
+        this.startOnlineReset();
+      }
+      return;
+    }
+    this.applyOnlineTurn(turnMessage);
+  }
+
+  applyOnlineTurn(turnMessage) {
     this.pendingOnlineTurn = null;
-    const recoveringKeeper = ['saved', 'beaten'].includes(this.keeper.state)
-      && this.keeper.landingTimer < this.keeperRecoveryDuration;
     this.onlineRole = turnMessage.role === 'shooter' ? 'lanzador' : 'portero';
     this.state = 'aiming';
     this.activeZone = null;
@@ -182,25 +192,62 @@ class PenaltisGame {
     this.keeper.catchContactTimer = 0;
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
-    if (!recoveringKeeper) {
-      this.keeper.x = this.keeper.baseX;
-      this.keeper.y = this.keeper.baseY;
-      this.keeper.rotation = 0;
-      this.keeper.state = 'idle';
-      this.keeper.landingTimer = 0;
-    }
-    this.keeper.recovering = recoveringKeeper;
+    this.keeper.x = this.keeper.baseX;
+    this.keeper.y = this.keeper.baseY;
+    this.keeper.rotation = 0;
+    this.keeper.state = 'idle';
+    this.keeper.landingTimer = 0;
+    this.keeper.recovering = false;
     this.keeper.diving = false;
     this.keeper.diveProgress = 0;
     this.keeper.anticipating = false;
-    if (!recoveringKeeper) this.keeper.diveDirection = 0;
+    this.keeper.diveDirection = 0;
+    this.ballFireTrail = [];
+  }
+
+  startOnlineReset() {
+    if (this.resetTransition || !this.pendingOnlineTurn) return;
+    this.beginShotReset(() => {
+      const turn = this.pendingOnlineTurn;
+      if (turn) this.applyOnlineTurn(turn);
+    });
+  }
+
+  beginShotReset(reset) {
+    if (this.resetTransition) return;
+    this.state = 'resetting';
+    this.resetTransition = { age: 0, switched: false, reset };
+  }
+
+  advanceShotReset(dt) {
+    const transition = this.resetTransition;
+    if (!transition) return;
+    transition.age = Math.min(this.shotResetDuration, transition.age + dt);
+    if (!transition.switched && transition.age >= this.shotResetDuration / 2) {
+      transition.switched = true;
+      transition.reset();
+      this.state = 'resetting';
+    }
+    if (transition.age >= this.shotResetDuration) {
+      this.resetTransition = null;
+      this.state = 'aiming';
+    }
+  }
+
+  shotResetOpacity() {
+    if (!this.resetTransition) return 1;
+    const half = this.shotResetDuration / 2;
+    const phase = this.resetTransition.age < half
+      ? 1 - this.resetTransition.age / half
+      : (this.resetTransition.age - half) / half;
+    return phase * phase * (3 - 2 * phase);
   }
 
   triggerOnlineShotAnimation(shooterZoneId, keeperZoneId, turnRole, isGoal) {
     const targetZone = this.TARGET_ZONES.find(z => z.id === shooterZoneId) || this.TARGET_ZONES[2];
     this.onlineVisualTurnRole = turnRole;
     this.onlineVisualIsGoal = isGoal;
-    this.ball.flightTime = 0.52;
+    this.ball.flightTime = 0.6;
     this.launchAnimeShot(targetZone, keeperZoneId);
   }
 
@@ -276,6 +323,8 @@ class PenaltisGame {
   }
 
   reset() {
+    this.resetTransition = null;
+    this.pendingOnlineTurn = null;
     this.score = 0;
     this.streak = 0;
     this.shotsTaken = 0;
@@ -310,9 +359,6 @@ class PenaltisGame {
       diveDirection: 0,
       diveStartX: 200,
       diveStartY: 270,
-      recoveryStartX: 200,
-      recoveryStartY: 270,
-      recoveryStartRotation: 0,
       anticipating: false,
       catchContactTimer: 0,
       diveSpeed: lvl.diveSpeed,
@@ -332,7 +378,7 @@ class PenaltisGame {
       targetX: 200,
       targetY: 200,
       progress: 0,
-      flightTime: 0.52,
+      flightTime: 0.6,
       rotation: 0,
       spin: 0,
       physicsState: null,
@@ -688,9 +734,6 @@ class PenaltisGame {
     const keeper = this.keeper;
     keeper.recovering = true;
     keeper.landingTimer = 0;
-    keeper.recoveryStartX = keeper.x;
-    keeper.recoveryStartY = keeper.y;
-    keeper.recoveryStartRotation = keeper.rotation;
   }
 
   launchAnimeShot(zone, keeperChoiceId = null) {
@@ -946,21 +989,11 @@ class PenaltisGame {
     this.updateGoalFlares(dt);
 
     if (this.keeper.recovering) {
-      if (this.keeper.catchContactTimer <= 0) {
-        const keeper = this.keeper;
-        keeper.diving = false;
-        keeper.landingTimer += dt;
-        const progress = Math.min(1, keeper.landingTimer / this.keeperRecoveryDuration);
-        const eased = progress * progress * (3 - 2 * progress);
-        keeper.x = keeper.recoveryStartX + (keeper.baseX - keeper.recoveryStartX) * eased;
-        keeper.y = keeper.recoveryStartY + (keeper.baseY - keeper.recoveryStartY) * eased;
-        keeper.rotation = keeper.recoveryStartRotation * (1 - eased);
-        if (progress >= 1) {
-          keeper.recovering = false;
-          keeper.state = 'idle';
-          keeper.rotation = 0;
-          keeper.diveDirection = 0;
-        }
+      // Hold the completed save/dive pose until the next shot is ready.
+      this.keeper.landingTimer += dt;
+      if (this.keeper.catchContactTimer <= 0) this.keeper.diving = false;
+      if (this.isOnlineMode && this.keeper.landingTimer >= this.keeperResultHold) {
+        this.startOnlineReset();
       }
     } else if (this.state === 'aiming') {
       this.keeper.idleTimer += dt;
@@ -1033,17 +1066,12 @@ class PenaltisGame {
           // updated score only when the ball reaches the goal/keeper plane.
           this.commitPendingOnlineScoreboard();
           this.resolveOnlineVisualOutcomeDirect(this.onlineVisualTurnRole, this.onlineVisualIsGoal);
-          this.state = 'aiming';
-          if (this.pendingOnlineTurn) {
-            const nextTurn = this.pendingOnlineTurn;
-            this.pendingOnlineTurn = null;
-            // Let the save/impact read on screen before the next online turn
-            // resets the ball and keeper to their ready positions.
-            setTimeout(() => this.setOnlineTurn(nextTurn), this.keeperRecoveryDuration * 1000);
-          }
+          this.state = 'result';
         }
       }
     }
+
+    this.advanceShotReset(dt);
 
     if (this.ball.inNet) {
       const ball = this.ball;
@@ -1343,7 +1371,7 @@ class PenaltisGame {
       if (this.shotsTaken >= this.maxShots) {
         this.finishShootout();
       } else {
-        this.resetNextShot();
+        this.beginShotReset(() => this.resetNextShot());
       }
     }, finalShotHold);
   }
@@ -1571,12 +1599,14 @@ class PenaltisGame {
 
     // Keep the keeper and ball round while the goal and pitch gain the wider perspective.
     ctx.save();
+    ctx.globalAlpha *= this.shotResetOpacity();
     ctx.translate(this.keeper.x, 0);
     ctx.scale(1 / sceneScaleX, 1);
     ctx.translate(-this.keeper.x, 0);
     this.renderCountryGoalkeeper(ctx);
     ctx.restore();
     ctx.save();
+    ctx.globalAlpha *= this.shotResetOpacity();
     ctx.translate(this.ball.x, 0);
     ctx.scale(1 / sceneScaleX, 1);
     ctx.translate(-this.ball.x, 0);
@@ -2369,6 +2399,7 @@ class PenaltisGame {
   renderCountryGoalkeeper(ctx) {
     const k = this.keeper;
     const lvl = this.currentLevel;
+    const baseAlpha = ctx.globalAlpha;
     const catching = this.ball?.result === 'saved' && k.catchContactTimer > 0;
     const divingPose = k.diving || catching;
     if (this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
@@ -2386,12 +2417,12 @@ class PenaltisGame {
 
     this.auraParticles.forEach(p => {
       ctx.fillStyle = p.color;
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = baseAlpha * Math.max(0, p.alpha);
       ctx.beginPath();
       ctx.arc(p.x - k.x, p.y - k.y, p.radius, 0, Math.PI * 2);
       ctx.fill();
     });
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = baseAlpha;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
@@ -2484,9 +2515,10 @@ class PenaltisGame {
 
   renderBallFireTrail(ctx) {
     ctx.save();
+    const baseAlpha = ctx.globalAlpha;
     this.ballFireTrail.forEach(f => {
       ctx.fillStyle = f.color;
-      ctx.globalAlpha = Math.max(0, f.alpha);
+      ctx.globalAlpha = baseAlpha * Math.max(0, f.alpha);
       ctx.beginPath();
       ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
       ctx.fill();
@@ -2498,12 +2530,13 @@ class PenaltisGame {
     const radius = ball.radius * ball.scale;
     if (radius <= 0) return;
     ctx.save();
+    const baseAlpha = ctx.globalAlpha;
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, radius * .98, 0, Math.PI * 2);
     ctx.clip();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = Math.max(.48, 1 - ball.netAge / .34);
+    ctx.globalAlpha = baseAlpha * Math.max(.48, 1 - ball.netAge / .34);
     const point = node => this.projectNetNode(node);
     // For the first fraction of a second after impact, let the strands cross
     // the ball silhouette: this makes the ball read as caught in the mesh.
@@ -2541,6 +2574,7 @@ class PenaltisGame {
   renderAnimeBall(ctx) {
     const b = this.ball;
     ctx.save();
+    const baseAlpha = ctx.globalAlpha;
 
     // The shadow stays on the turf while the ball rises toward the goal.
     const flight = b.inFlight || b.inNet ? Math.min(1, b.progress || 1) : 0;
@@ -2550,14 +2584,14 @@ class PenaltisGame {
       ? b.startY + (goalLineY - b.startY) * flight
       : b.y + b.radius * b.scale * .72;
     const shadowScale = b.inFlight || b.inNet ? .92 * b.scale : .92;
-    ctx.globalAlpha = b.inFlight ? .22 - flight * .13 : b.inNet ? .08 : .24;
+    ctx.globalAlpha = baseAlpha * (b.inFlight ? .22 - flight * .13 : b.inNet ? .08 : .24);
     ctx.fillStyle = '#02070a';
     ctx.filter = 'blur(5px)';
     ctx.beginPath();
     ctx.ellipse(shadowX, shadowY, b.radius * shadowScale, b.radius * .25 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.filter = 'none';
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = baseAlpha;
 
     if (this.football3D) {
       try {

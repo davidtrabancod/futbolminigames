@@ -53,15 +53,16 @@
     const spriteScale = scale * .68;
     const direction = diveDirection || Math.sign(diveRotation);
     const motion = Math.max(0, Math.min(1, diveProgress));
-    const landing = ['saved', 'beaten'].includes(keeperState) ? Math.max(0, 1 - landingTimer / 1.2) : 0;
+    const holdingDive = keeperState === 'saved' || keeperState === 'beaten';
     const idlePhase = time * [1.2, 2.7, 1.1, .8, 1.9, 1.35, 1.05, .9][p.artIndex];
     const breath = Math.sin(idlePhase);
     const diveFrame = direction < 0 ? 2 : direction > 0 ? 3 : 1;
     const center = zoneId === 'center';
     const low = zoneId?.startsWith('bottom');
     const finalAngle = direction * -.035;
-    const footX = x + (diving ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
-    const footY = y + 40 + (diving ? 0 : breath * .8) - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
+    const footX = x + (diving || holdingDive ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
+    const footY = y + 40 + (diving || holdingDive ? 0 : breath * .8) - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
+    const baseAlpha = ctx.globalAlpha;
 
     const drawPose = (pose, alpha, offsetX = 0, offsetY = 0, angle = 0) => {
       if (alpha <= .01) return;
@@ -134,19 +135,19 @@
       const lowArt = direction < 0 ? lowLeftArt : lowRightArt;
       if (low && lowArt?.complete && lowArt.naturalWidth) {
         if (value < .18) {
-          const mix = blend(.07, .18, value);
+          const mix = blend(.135, .18, value);
           drawPose(1, 1 - mix);
           drawLowPose(0, mix, value);
         } else if (value < .44) {
-          const mix = blend(.35, .44, value);
+          const mix = blend(.395, .44, value);
           drawLowPose(0, 1 - mix, value);
           drawLowPose(1, mix, value);
         } else if (value < .7) {
-          const mix = blend(.61, .7, value);
+          const mix = blend(.655, .7, value);
           drawLowPose(1, 1 - mix, value);
           drawLowPose(2, mix, value);
         } else {
-          const mix = blend(.82, .96, value);
+          const mix = blend(.915, .96, value);
           drawLowPose(2, 1 - mix, value);
           drawLowPose(3, mix, value);
         }
@@ -156,22 +157,22 @@
       const angle = finalAngle * blend(.08, .92, value);
       const settle = -Math.sin(value * Math.PI) * 5;
       if (!diveArt?.complete || !diveArt.naturalWidth || !direction) {
-        drawPose(1, 1 - blend(.08, .2, value));
-        drawPose(diveFrame, blend(.08, .2, value), 0, settle, angle);
+        drawPose(1, 1 - blend(.155, .2, value));
+        drawPose(diveFrame, blend(.155, .2, value), 0, settle, angle);
       } else if (value < .16) {
-        const mix = blend(.05, .16, value);
+        const mix = blend(.115, .16, value);
         drawPose(1, 1 - mix, 0, -2, direction * -.025);
         drawDivePose(first, mix, settle, angle);
       } else if (value < .43) {
-        const mix = blend(.34, .43, value);
+        const mix = blend(.385, .43, value);
         drawDivePose(first, 1 - mix, settle, angle);
         drawDivePose(first + 1, mix, settle, angle);
       } else if (value < .69) {
-        const mix = blend(.6, .69, value);
+        const mix = blend(.645, .69, value);
         drawDivePose(first + 1, 1 - mix, settle, angle);
         drawDivePose(first + 2, mix, settle, angle);
       } else {
-        const mix = blend(.82, .96, value);
+        const mix = blend(.915, .96, value);
         drawDivePose(first + 2, 1 - mix, settle, angle);
         drawPose(diveFrame, mix, 0, settle, angle);
       }
@@ -183,18 +184,18 @@
         return;
       }
       if (value < .49) {
-        const mix = blend(.36, .49, value);
+        const mix = blend(.445, .49, value);
         drawCenterPose(0, 1 - mix);
         drawCenterPose(1, mix);
       } else {
-        const mix = blend(.64, .8, value);
+        const mix = blend(.755, .8, value);
         drawCenterPose(1, 1 - mix);
         drawCenterPose(2, mix);
       }
     };
 
     ctx.save();
-    ctx.globalAlpha = .42;
+    ctx.globalAlpha = baseAlpha * .42;
     ctx.fillStyle = '#020916';
     ctx.beginPath();
     ctx.ellipse(footX, y + 40, 24 + (diving ? 12 : 0), 5, 0, 0, Math.PI * 2);
@@ -203,7 +204,7 @@
 
     if (diving && !low) {
       ctx.save();
-      ctx.globalAlpha = .16 + motion * .18;
+      ctx.globalAlpha = baseAlpha * (.16 + motion * .18);
       ctx.strokeStyle = p.colors[0];
       ctx.lineWidth = 2;
       for (let i = 0; i < 5; i++) {
@@ -215,27 +216,14 @@
         ctx.stroke();
       }
       ctx.restore();
-    } else if (landing > .78) {
-      ctx.save();
-      ctx.globalAlpha = (landing - .78) * 1.8;
-      ctx.strokeStyle = p.colors[0];
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(x, y + 40, 27 + (1 - landing) * 30, 5 + (1 - landing) * 4, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
     }
 
     if (diving) {
       if (center) drawCenterSequence(motion);
       else drawSideSequence(motion);
-    } else if (landing > 0) {
-      if (landing < .05) {
-        drawPose(0, 1 - landing / .05);
-        if (center) drawCenterPose(0, landing / .05);
-        else drawPose(1, landing / .05);
-      } else if (center) drawCenterSequence(landing);
-      else drawSideSequence(landing);
+    } else if (holdingDive) {
+      if (center) drawCenterSequence(1);
+      else drawSideSequence(1);
     } else if (anticipating) {
       drawPose(1, 1, 0, -2, direction * -.025);
     } else {
@@ -244,16 +232,16 @@
 
     if (anticipating) {
       ctx.save();
-      ctx.globalAlpha = .18 + Math.sin(time * 24) * .05;
+      ctx.globalAlpha = baseAlpha * (.18 + Math.sin(time * 24) * .05);
       ctx.strokeStyle = p.colors[0];
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.ellipse(footX, y + 36, 29 + Math.sin(time * 18) * 2, 7, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-    } else if (!diving && landing <= 0) {
+    } else if (!diving && !holdingDive) {
       ctx.save();
-      ctx.globalAlpha = .055 + (breath + 1) * .025;
+      ctx.globalAlpha = baseAlpha * (.055 + (breath + 1) * .025);
       ctx.strokeStyle = p.colors[0];
       ctx.lineWidth = 1.5;
       ctx.beginPath();
