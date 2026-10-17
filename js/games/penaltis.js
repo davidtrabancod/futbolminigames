@@ -203,9 +203,8 @@ class PenaltisGame {
     this.netConstraints = [];
     this.netPhysicsAccumulator = 0;
 
-    // The animated back panel is anchored to the rear frame of the goal.
-    // Keeping its rest depth here makes the ball deform real netting instead
-    // of a loose grid floating across the mouth of the goal.
+    // The rear panel hangs between two outside corner struts. Its top edge is
+    // free between the corner anchors, so the net has a little natural slack.
     const netLeft = .16, netRight = 7.16, netBottom = .08, netTop = 2.36;
     const netRestDepth = this.netDepth;
     for (let r = 0; r <= this.netRows; r++) {
@@ -214,7 +213,8 @@ class PenaltisGame {
         const u = c / this.netCols;
         const v = r / this.netRows;
         const x = netLeft + u * (netRight - netLeft);
-        const y = netBottom + (1 - v) * (netTop - netBottom);
+        const y = netBottom + (1 - v) * (netTop - netBottom)
+          - 0.13 * Math.sin(Math.PI * u) * (1 - v);
         this.netNodes[r][c] = {
           origX: x,
           origY: y,
@@ -225,7 +225,8 @@ class PenaltisGame {
           vx: 0,
           vy: 0,
           vz: 0,
-          invMass: (r === 0 || r === this.netRows || c === 0 || c === this.netCols) ? 0 : 1,
+          invMass: (r === this.netRows || c === 0 || c === this.netCols
+            || (r === 0 && (c === 0 || c === this.netCols))) ? 0 : 1,
           prevX: x,
           prevY: y,
           prevDepth: netRestDepth
@@ -2072,7 +2073,10 @@ class PenaltisGame {
   renderAnimePosts(ctx) {
     const p = (x, y, z = 0) => this.projectGoal3D(x, y, z);
     const frontFrame = [p(0,0),p(0,2.44),p(7.32,2.44),p(7.32,0)];
-    const rearFrame = [p(.16,.04,1.8),p(.16,2.39,1.8),p(7.16,2.39,1.8),p(7.16,.04,1.8),p(.16,.04,1.8)];
+    const rearSupports = [
+      [p(.16,2.39,1.8),p(-.30,.035,2.02)],
+      [p(7.16,2.39,1.8),p(7.62,.035,2.02)]
+    ];
     const depthBraces = [
       [p(0,0),p(.16,.04,1.8)],[p(0,2.44),p(.16,2.39,1.8)],
       [p(7.32,0),p(7.16,.04,1.8)],[p(7.32,2.44),p(7.16,2.39,1.8)]
@@ -2084,7 +2088,7 @@ class PenaltisGame {
       ctx.beginPath(); ctx.ellipse(x, 328, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
     }
     this.drawGoalFramePath(ctx, frontFrame, 6.5);
-    this.drawGoalFramePath(ctx, rearFrame, 3.4);
+    for (const [a,b] of rearSupports) this.drawGoalTube(ctx,a,b);
     for (const [a,b] of depthBraces) this.drawGoalTube(ctx,a,b);
     ctx.restore();
   }

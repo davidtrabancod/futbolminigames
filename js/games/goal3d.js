@@ -128,15 +128,19 @@ class Goal3DRenderer {
     add([-half, top, front], [half, top, front], 0.055, bright);
     add([half, top, front], [half, 0.02, front], 0.055, bright);
 
-    // Rear cage and depth rails make the goal a braced 3D structure planted on the pitch.
-    add([-half, 0.02, back], [-half, top, back], 0.038, trim);
-    add([-half, top, back], [half, top, back], 0.038, trim);
-    add([half, top, back], [half, 0.02, back], 0.038, trim);
+    // Keep the side rails, but leave the back of the net unsupported by a rigid
+    // U-frame. Two short struts sit outside the net and hold only its rear corners.
     add([-half, 0.02, front], [-half, 0.02, back], 0.046, bright);
     add([half, 0.02, front], [half, 0.02, back], 0.046, bright);
     add([-half, top, front], [-half, top, back], 0.046, bright);
     add([half, top, front], [half, top, back], 0.046, bright);
-    add([-half, 0.02, back], [half, 0.02, back], 0.035, shadow);
+    for (const side of [-1, 1]) {
+      const corner = [side * (half - 0.16), top - 0.08, back + 0.02];
+      const foot = [side * (half + 0.46), 0.035, back - 0.22];
+      add(corner, foot, 0.034, trim);
+      add([foot[0] - side * 0.12, 0.035, foot[2] - 0.08],
+          [foot[0] + side * 0.12, 0.035, foot[2] + 0.08], 0.045, shadow);
+    }
 
     // Dark ground shoes and spherical corner sleeves visually join the rails.
     for (const x of [-half, half]) {
