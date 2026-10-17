@@ -885,12 +885,21 @@ class OnlineArena {
     if (this.refs.suddenDeathBadge) this.refs.suddenDeathBadge.classList.toggle('hidden', !suddenDeath);
 
     if (this.app.games && this.app.games.penaltis) {
-      this.app.games.penaltis.onlineMyScore = scores[this.playerIndex];
-      this.app.games.penaltis.onlineOppScore = scores[1 - this.playerIndex];
-      
-      // Sincronizar el número total de tiros realizados para la muerte súbita
-      this.app.games.penaltis.onlineMyShotsTotal = shots[this.playerIndex];
-      this.app.games.penaltis.onlineOppShotsTotal = shots[1 - this.playerIndex];
+      const penaltyGame = this.app.games.penaltis;
+      const nextScoreboard = {
+        myScore: scores[this.playerIndex],
+        oppScore: scores[1 - this.playerIndex],
+        myShotsTotal: shots[this.playerIndex],
+        oppShotsTotal: shots[1 - this.playerIndex]
+      };
+      if (penaltyGame.isOnlineMode && penaltyGame.ball?.inFlight) {
+        penaltyGame.pendingOnlineScoreboard = nextScoreboard;
+      } else {
+        penaltyGame.onlineMyScore = nextScoreboard.myScore;
+        penaltyGame.onlineOppScore = nextScoreboard.oppScore;
+        penaltyGame.onlineMyShotsTotal = nextScoreboard.myShotsTotal;
+        penaltyGame.onlineOppShotsTotal = nextScoreboard.oppShotsTotal;
+      }
     }
   }
 

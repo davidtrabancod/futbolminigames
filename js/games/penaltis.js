@@ -146,6 +146,7 @@ class PenaltisGame {
     this.onlineOppHistory = [];
     this.onlineMyScore = 0;
     this.onlineOppScore = 0;
+    this.pendingOnlineScoreboard = null;
     this.state = 'aiming';
 
     this.reset();
@@ -201,6 +202,16 @@ class PenaltisGame {
     this.onlineVisualIsGoal = isGoal;
     this.ball.flightTime = 0.52;
     this.launchAnimeShot(targetZone, keeperZoneId);
+  }
+
+  commitPendingOnlineScoreboard() {
+    if (!this.pendingOnlineScoreboard) return;
+    const scores = this.pendingOnlineScoreboard;
+    this.onlineMyScore = scores.myScore;
+    this.onlineOppScore = scores.oppScore;
+    this.onlineMyShotsTotal = scores.myShotsTotal;
+    this.onlineOppShotsTotal = scores.oppShotsTotal;
+    this.pendingOnlineScoreboard = null;
   }
   // ----------------------
 
@@ -1015,6 +1026,9 @@ class PenaltisGame {
         if (!this.isOnlineMode) {
           this.resolveAnimePenalty();
         } else {
+          // The authoritative result arrives before the animation. Reveal the
+          // updated score only when the ball reaches the goal/keeper plane.
+          this.commitPendingOnlineScoreboard();
           this.resolveOnlineVisualOutcomeDirect(this.onlineVisualTurnRole, this.onlineVisualIsGoal);
           this.state = 'aiming';
           if (this.pendingOnlineTurn) {
