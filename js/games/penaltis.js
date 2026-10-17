@@ -51,11 +51,11 @@ class PenaltisGame {
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', ...targetOnNet(1.02, 1.82), icon: '↖️' },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', ...targetOnNet(6.30, 1.82), icon: '↗️' },
-      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', ...targetOnNet(3.66, 1.22), icon: '🎯' },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', ...targetOnNet(1.02, .60), icon: '↙️' },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', ...targetOnNet(6.30, .60), icon: '↘️' }
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', ...targetOnNet(1.02, 1.82) },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', ...targetOnNet(6.30, 1.82) },
+      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', ...targetOnNet(3.66, 1.22) },
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', ...targetOnNet(1.02, .60) },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', ...targetOnNet(6.30, .60) }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -2143,7 +2143,7 @@ class PenaltisGame {
   }
 
   renderAnimeTargetDials(ctx) {
-    this.TARGET_ZONES.forEach(z => {
+    this.TARGET_ZONES.forEach((z, index) => {
       const isSelected = this.activeZone && this.activeZone.id === z.id;
       const isHovered = this.hoverZone && this.hoverZone.id === z.id;
 
@@ -2151,38 +2151,70 @@ class PenaltisGame {
       ctx.translate(z.x, z.y);
       ctx.scale(1 / 1.5, 1);
 
-      const pulse = isSelected ? Math.sin(this.timer * 10) * 5 : 0;
-      const r = (isSelected ? 21 : 18) + pulse;
+      const phase = this.timer * (isSelected ? 7 : 2.1) + index * 1.25;
+      const breathe = (Math.sin(phase) + 1) * 0.5;
+      const color = isSelected ? '#ffe66d' : isHovered ? '#55eaff' : '#effaff';
+      const radius = (isSelected ? 22 : 18) + (isSelected ? breathe * 2.5 : breathe * 1.2);
+      const alpha = isSelected ? 0.95 : isHovered ? 0.9 : 0.68;
 
-      if (isSelected || isHovered) {
-        ctx.fillStyle = isSelected ? 'rgba(250, 204, 21, 0.45)' : 'rgba(56, 189, 248, 0.35)';
+      // Soft halo keeps the target legible against both net and crowd.
+      ctx.globalAlpha = isSelected ? 0.2 + breathe * 0.12 : isHovered ? 0.16 : 0.07 + breathe * 0.035;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius + (isSelected ? 15 : 11), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = isSelected ? 18 : isHovered ? 13 : 6;
+      ctx.lineWidth = isSelected ? 2.6 : 1.8;
+      ctx.strokeStyle = color;
+
+      // Four separated arcs read as a precision aiming reticle, not a button.
+      const arcGap = 0.18;
+      for (let quadrant = 0; quadrant < 4; quadrant++) {
+        const start = quadrant * Math.PI / 2 + arcGap;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 15, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.arc(0, 0, radius, start, start + Math.PI / 2 - arcGap * 2);
+        ctx.stroke();
       }
 
-      ctx.strokeStyle = isSelected ? '#facc15' : isHovered ? '#38bdf8' : 'rgba(255, 255, 255, 0.85)';
-      ctx.lineWidth = isSelected ? 3.5 : 2;
-
-      const len = 10;
+      // Fine outer calibration marks and a slowly rotating scan highlight.
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = isSelected ? 0.72 : 0.38;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(-r, -r + len); ctx.lineTo(-r, -r); ctx.lineTo(-r + len, -r);
-      ctx.moveTo(r - len, -r); ctx.lineTo(r, -r); ctx.lineTo(r, -r + len);
-      ctx.moveTo(-r, r - len); ctx.lineTo(-r, r); ctx.lineTo(-r + len, r);
-      ctx.moveTo(r - len, r); ctx.lineTo(r, r); ctx.lineTo(r, r - len);
+      ctx.arc(0, 0, radius + 5, 0, Math.PI * 2);
       ctx.stroke();
-
+      for (let tick = 0; tick < 8; tick++) {
+        const angle = tick * Math.PI / 4;
+        const inner = radius + 3;
+        const outer = radius + (tick % 2 === 0 ? 8 : 6);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+        ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+        ctx.stroke();
+      }
+      ctx.save();
+      ctx.rotate(phase * 0.22);
+      ctx.globalAlpha = isSelected ? 0.95 : isHovered ? 0.72 : 0.34;
+      ctx.lineWidth = isSelected ? 3 : 2;
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+      ctx.arc(0, 0, radius + 5, -0.48, 0.48);
       ctx.stroke();
+      ctx.restore();
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 12px Fredoka, sans-serif';
+      // Center pin and a compact index identify each of the five shot lanes.
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, isSelected ? 3.3 : 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = isSelected ? 1 : 0.78;
+      ctx.font = '700 9px Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(z.icon, 0, 0);
-
-      // (Textos flotantes eliminados a petición)
+      ctx.fillText(String(index + 1).padStart(2, '0'), 0, radius + 18);
 
       ctx.restore();
     });
