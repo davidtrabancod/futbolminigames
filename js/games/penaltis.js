@@ -35,14 +35,21 @@ class PenaltisGame {
 
     this.vWidth = 400;
     this.vHeight = 600;
+    this.netDepth = 1.88;
+    this.netPerspective = 1 / (1 + this.netDepth / 26.6);
+    this.netGroundY = 287 + (310 - 287) * this.netPerspective;
+    const targetOnNet = (worldX, worldY) => ({
+      x: 200 + (worldX - 3.66) * 43.8 * this.netPerspective,
+      y: this.netGroundY - worldY * 65.6 * this.netPerspective
+    });
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 166, icon: '↖️' },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 166, icon: '↗️' },
-      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 230, icon: '🎯' },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 294, icon: '↙️' },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 294, icon: '↘️' }
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', ...targetOnNet(1.02, 1.82), icon: '↖️' },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', ...targetOnNet(6.30, 1.82), icon: '↗️' },
+      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', ...targetOnNet(3.66, 1.22), icon: '🎯' },
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', ...targetOnNet(1.02, .60), icon: '↙️' },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', ...targetOnNet(6.30, .60), icon: '↘️' }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -200,7 +207,7 @@ class PenaltisGame {
     // Keeping its rest depth here makes the ball deform real netting instead
     // of a loose grid floating across the mouth of the goal.
     const netLeft = .16, netRight = 7.16, netBottom = .08, netTop = 2.36;
-    const netRestDepth = 1.8;
+    const netRestDepth = this.netDepth;
     for (let r = 0; r <= this.netRows; r++) {
       this.netNodes[r] = [];
       for (let c = 0; c <= this.netCols; c++) {
@@ -329,6 +336,7 @@ class PenaltisGame {
     this.feedbackAlpha = 0;
     this.feedbackScale = 1;
     this.feedbackColor = '#facc15';
+    this.netImpactPoint = null;
 
     this.camera.zoom = 1.0;
     this.camera.targetZoom = 1.0;
@@ -690,10 +698,10 @@ class PenaltisGame {
     const depth = this.ball.physicsTargetDepth || 0;
     const depthRatio = depth > 0 ? Math.max(0, Math.min(1, state.z / depth)) : 0;
     const perspective = 1 / (1 + Math.max(0, state.z) / 26.6);
-    const groundY = 517.2 + (317.2 - 517.2) * depthRatio;
+    const groundY = 517.2 + (this.netGroundY - 517.2) * depthRatio;
     return {
       x: 200 + state.x * 43.8 * perspective,
-      y: groundY - state.y * 65.6,
+      y: groundY - state.y * 65.6 * perspective,
       scale: perspective
     };
   }
@@ -747,12 +755,12 @@ class PenaltisGame {
 
   createBallFlightPhysics(zone) {
     const duration = this.ball.flightTime;
-    const targetPerspective = .71;
-    const targetDepth = 26.6 * (1 / targetPerspective - 1);
+    const targetPerspective = this.netPerspective;
+    const targetDepth = this.netDepth;
     this.ball.physicsTargetDepth = targetDepth;
     const target = [
       (zone.x - 200) / (43.8 * targetPerspective),
-      (317.2 - zone.y) / 65.6,
+      (this.netGroundY - zone.y) / (65.6 * targetPerspective),
       targetDepth
     ];
     const spin = this.ball.spin;
@@ -975,9 +983,9 @@ class PenaltisGame {
         ball.rotation += step * ball.spin;
         ball.spin *= Math.exp(-2.4 * step);
         const visibleRadius = ball.radius * ball.scale;
-        const left = this.goal.x + visibleRadius;
-        const right = this.goal.x + this.goal.w - visibleRadius;
-        const bottom = this.goal.y + this.goal.h - visibleRadius;
+        const left = this.projectGoal3D(.16, .08, this.netDepth).x + visibleRadius;
+        const right = this.projectGoal3D(7.16, .08, this.netDepth).x - visibleRadius;
+        const bottom = this.projectGoal3D(3.66, .08, this.netDepth).y - visibleRadius;
         if (ball.x < left || ball.x > right) {
           ball.x = Math.max(left, Math.min(right, ball.x));
           ball.velocityX *= -.42;
@@ -1017,7 +1025,7 @@ class PenaltisGame {
           ball.spin *= Math.exp(-.9 * step);
           ball.deflectAccumulator -= step;
         }
-        ball.scale = Math.min(1, .71 + ball.deflectAge * .28);
+        ball.scale = Math.min(1, this.netPerspective + ball.deflectAge * .1);
         if (ball.deflectAge > .9 || ball.y > 410) ball.isDeflected = false;
       }
     }
@@ -1104,20 +1112,25 @@ class PenaltisGame {
     }
   }
 
-  bulgeNet(impactX, impactY, impactSpeed = 16, lateralSpeed = 0) {
-    const hitX = Math.max(0, Math.min(7.32, ((impactX - this.goal.x) / this.goal.w) * 7.32));
-    const hitY = Math.max(0, Math.min(2.44, ((this.goal.y + this.goal.h - impactY) / this.goal.h) * 2.44));
-    const impulse = Math.max(3.2, Math.min(24, impactSpeed * .82));
+  bulgeNet(impactX, impactY, physics = null) {
+    const impactSpeed = physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 8;
+    const hitX = Math.max(0, Math.min(7.32,
+      3.66 + (impactX - 200) / (43.8 * this.netPerspective)));
+    const hitY = Math.max(0, Math.min(2.44,
+      (this.netGroundY - impactY) / (65.6 * this.netPerspective)));
+    const impulse = Math.max(2, Math.min(12, impactSpeed * .8));
+    this.netImpactPoint = { x: hitX, y: hitY };
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
         const dx = node.origX - hitX;
         const dy = node.origY - hitY;
         const dist = Math.hypot(dx, dy);
-        if (node.invMass && dist < 1.05) {
-          const falloff = Math.exp(-(dist * dist) / .22);
+        if (node.invMass && dist < 1.25) {
+          const falloff = Math.exp(-(dist * dist) / .3);
           node.vz += impulse * falloff;
-          node.vx += lateralSpeed * falloff * .035;
+          node.vx += (physics?.vx || 0) * falloff * .12;
+          node.vy += (physics?.vy || 0) * falloff * .1;
         }
       }
     }
@@ -1128,7 +1141,7 @@ class PenaltisGame {
       this.ball.x = this.ball.selectedZone.x;
       this.ball.y = this.ball.selectedZone.y;
     }
-    this.ball.scale = .71;
+    this.ball.scale = this.netPerspective;
     this.camera.shake = 0;
     this.camera.targetZoom = 1.0;
 
@@ -1141,9 +1154,7 @@ class PenaltisGame {
       this.ball.result = 'goal';
       this.keeper.state = 'beaten';
       const physics = this.ball.physicsState;
-      this.bulgeNet(this.ball.targetX, this.ball.targetY,
-        physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 16,
-        physics?.vx || 0);
+      this.bulgeNet(this.ball.targetX, this.ball.targetY, physics);
       this.spawnCelebrationFlares();
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -1229,7 +1240,7 @@ class PenaltisGame {
     this.ball.inNet = true;
     this.ball.netAge = 0;
     this.ball.netAccumulator = 0;
-    this.ball.scale = .71;
+    this.ball.scale = this.netPerspective;
     this.ball.velocityX = Math.max(-28, Math.min(28, this.ball.flightVX * .055));
     this.ball.velocityY = Math.max(-30, Math.min(30, this.ball.flightVY * .055));
     this.ball.result = 'goal';
@@ -1237,9 +1248,7 @@ class PenaltisGame {
 
     this.camera.shake = 0;
     const physics = this.ball.physicsState;
-    this.bulgeNet(this.ball.targetX, this.ball.targetY,
-      physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 16,
-      physics?.vx || 0);
+    this.bulgeNet(this.ball.targetX, this.ball.targetY, physics);
     this.spawnCelebrationFlares();
 
     if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -1413,7 +1422,7 @@ class PenaltisGame {
     this.renderPenaltyPitchDetails(ctx);
     if (this.goal3D) {
       try {
-        this.goal3D.draw(this.netNodes);
+        this.goal3D.draw(this.netNodes, this.netImpactPoint);
         ctx.drawImage(this.goal3D.canvas, 0, 0, this.vWidth, this.vHeight);
       } catch (error) {
         console.warn('Se perdió el contexto 3D de la portería:', error);
@@ -1946,13 +1955,22 @@ class PenaltisGame {
   }
 
   projectGoal3D(x, y, depth = 0) {
-    const d = Math.max(0, Math.min(2.2, depth));
+    const d = Math.max(0, depth);
     const perspective = 1 / (1 + d / 26.6);
     return {
       // Match the compressed field's vanishing point and goal-line height.
-      x: 200 + (x / 7.32 - .5) * 322 * perspective,
-      y: 287 + (310 - (y / 2.44) * 160 - 287) * perspective
+      x: 200 + (x - 3.66) * 43.8 * perspective,
+      y: 287 + (310 - y * 65.6 - 287) * perspective
     };
+  }
+
+  projectNetNode(node) {
+    const flex = node.depth - node.origDepth;
+    const impact = this.netImpactPoint;
+    const stretch = impact ? Math.max(.72, Math.min(1.8, 1 + flex * 5)) : 1;
+    const x = impact ? impact.x + (node.x - impact.x) * stretch : node.x;
+    const y = impact ? impact.y + (node.y - impact.y) * stretch : node.y;
+    return this.projectGoal3D(x, y, Math.max(0, node.depth + flex * .35));
   }
 
   drawGoalTube(ctx, a, b) {
@@ -2028,10 +2046,7 @@ class PenaltisGame {
   }
 
   renderAnimeNet(ctx) {
-    const pointAt = (r, c) => {
-      const n = this.netNodes[r][c];
-      return this.projectGoal3D(n.x, n.y, n.depth);
-    };
+    const pointAt = (r, c) => this.projectNetNode(this.netNodes[r][c]);
     ctx.save();
 
     // This deformable net starts directly behind the integrated photo frame (z=0).
@@ -2084,7 +2099,7 @@ class PenaltisGame {
       ctx.scale(1 / 1.5, 1);
 
       const pulse = isSelected ? Math.sin(this.timer * 10) * 5 : 0;
-      const r = (isSelected ? 32 : 26) + pulse;
+      const r = (isSelected ? 21 : 18) + pulse;
 
       if (isSelected || isHovered) {
         ctx.fillStyle = isSelected ? 'rgba(250, 204, 21, 0.45)' : 'rgba(56, 189, 248, 0.35)';
@@ -2262,14 +2277,7 @@ class PenaltisGame {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = Math.max(.48, 1 - ball.netAge / .34);
-    const point = node => {
-      const visualDepth = Math.max(0, node.depth + (node.depth - node.origDepth) * 7);
-      const perspective = 1 / (1 + visualDepth / 26.6);
-      return {
-        x: 200 + (node.x / 7.32 - .5) * 322 * perspective,
-        y: 287 + (310 - (node.y / 2.44) * 160 - 287) * perspective
-      };
-    };
+    const point = node => this.projectNetNode(node);
     // For the first fraction of a second after impact, let the strands cross
     // the ball silhouette: this makes the ball read as caught in the mesh.
     const drawStrands = () => {

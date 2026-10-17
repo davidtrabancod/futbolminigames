@@ -162,7 +162,7 @@ class Goal3DRenderer {
     gl.enableVertexAttribArray(color); gl.vertexAttribPointer(color, 4, gl.FLOAT, false, stride, 6 * 4);
   }
 
-  buildNet(nodes) {
+  buildNet(nodes, impactPoint = null) {
     // Braided nylon is intentionally brighter and more opaque than the old
     // pale overlay so the rear wall reads as a real net against the stadium.
     const out = [], baseColor = [0.78, 0.85, 0.80, 0.58];
@@ -179,24 +179,31 @@ class Goal3DRenderer {
       ];
       this.vertex(out, a, normal, color); this.vertex(out, b, normal, color);
     };
+    const position = node => {
+      const flex = node.depth - (node.origDepth ?? 1.8);
+      // A head-on view compresses depth changes. Convert the node's measured
+      // recoil into a restrained radial spread that reads as a stretched pocket.
+      const stretch = impactPoint
+        ? Math.max(.72, Math.min(1.8, 1 + flex * 5))
+        : 1;
+      const x = impactPoint ? impactPoint.x + (node.x - impactPoint.x) * stretch : node.x;
+      const y = impactPoint ? impactPoint.y + (node.y - impactPoint.y) * stretch : node.y;
+      return [x - 3.66, y, -Math.max(0, node.depth + flex * .35)];
+    };
     if (nodes?.length) {
       for (let r = 0; r < nodes.length; r++) for (let c = 0; c < nodes[r].length; c++) {
         const n = nodes[r][c];
-        // The stadium plate is a compressed camera view. Amplify only the
-        // net's live displacement so a real, sub-metre cloth pocket remains
-        // legible at this viewing distance; the undeformed goal dimensions
-        // and perspective stay untouched.
+        // Keep the rest mesh fixed; only its live impact displacement changes
+        // the rendered pocket and tension highlights.
         const flex = n.depth - (n.origDepth ?? 1.8);
-        const p = [n.x - 3.66, n.y, -Math.max(0, n.depth + flex * 7)];
+        const p = position(n);
         if (c < nodes[r].length - 1) {
           const next = nodes[r][c + 1];
-          const nextFlex = next.depth - (next.origDepth ?? 1.8);
-          line(p, [next.x - 3.66, next.y, -Math.max(0, next.depth + nextFlex * 7)], Math.max(Math.abs(flex), Math.abs(nextFlex)));
+          line(p, position(next), Math.max(Math.abs(flex), Math.abs(next.depth - (next.origDepth ?? 1.8))));
         }
         if (r < nodes.length - 1) {
           const next = nodes[r + 1][c];
-          const nextFlex = next.depth - (next.origDepth ?? 1.8);
-          line(p, [next.x - 3.66, next.y, -Math.max(0, next.depth + nextFlex * 7)], Math.max(Math.abs(flex), Math.abs(nextFlex)));
+          line(p, position(next), Math.max(Math.abs(flex), Math.abs(next.depth - (next.origDepth ?? 1.8))));
         }
       }
     }
@@ -229,18 +236,12 @@ class Goal3DRenderer {
         line([half, y0, z], [half, y1, z]);
       }
     }
-    for (let i = 0; i <= cols; i++) {
-      const x = -half + (2 * half * i / cols);
-      line([x, bottom, rear], [x, top, rear]);
-    }
-    for (let i = 0; i <= rows; i++) {
-      const y = bottom + (top - bottom) * i / rows;
-      line([-half, y, rear], [half, y, rear]);
-    }
+    // The rear wall is the deformable node grid above. Drawing a second,
+    // rigid lattice here would sit in front of the pocket and hide its motion.
     return new Float32Array(out);
   }
 
-  draw(nodes) {
+  draw(nodes, impactPoint = null) {
     const gl = this.gl;
     gl.viewport(0, 0, this.width, this.height);
     gl.clearColor(0, 0, 0, 0);
@@ -256,7 +257,7 @@ class Goal3DRenderer {
     this.configureAttributes();
     gl.drawArrays(gl.TRIANGLES, 0, this.frameData.length / 10);
 
-    const net = this.buildNet(nodes);
+    const net = this.buildNet(nodes, impactPoint);
     this.bindBuffer(this.netBuffer, net);
     this.configureAttributes();
     gl.depthMask(false);
