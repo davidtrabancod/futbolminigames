@@ -954,8 +954,13 @@ class OnlineArena {
     this.refs.onlineMatchScreen.classList.add('is-result');
     this.refs.forfeitOnlineBtn.classList.add('hidden');
 
-    this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : normal ? 'PARTIDA NORMAL' : 'PARTIDA AMISTOSA';
-    this.refs.onlineResultIcon.textContent = won ? '🏆' : draw ? '🤝' : '⚡';
+    this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : normal ? 'PARTIDA NORMAL' : 'PARTIDA AMISTOSA';    const resultMark = won
+      ? '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 7h18v8c0 8-4 13-9 13s-9-5-9-13V7Z"/><path d="M15 11H8v4c0 6 4 9 10 9M33 11h7v4c0 6-4 9-10 9M24 28v8m-8 5h16l-2-5H18l-2 5Z"/></svg>'
+      : draw
+        ? '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="16"/><path d="M14 20h20M14 28h20"/><circle cx="24" cy="24" r="2"/></svg>'
+        : '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 5 16 6v11c0 10-7 17-16 21C15 39 8 32 8 22V11l16-6Z"/><path d="m17 17 14 14m0-14L17 31"/></svg>';
+    this.refs.onlineResultIcon.innerHTML = resultMark;
+    this.refs.onlineResultIcon.dataset.result = won ? 'win' : draw ? 'draw' : 'loss';
     this.refs.onlineResultTitle.textContent = won ? '¡Victoria!' : draw ? 'Empate' : 'Derrota';
     let reason = '';
     if (message.reason === 'forfeit') reason = won ? ' · victoria por abandono' : ' · partida por abandono';

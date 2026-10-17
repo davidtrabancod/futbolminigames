@@ -19,6 +19,8 @@
     return roster.find(item => item.id === id) || roster[0];
   };
   const cardArt = typeof Image !== 'undefined' ? new Image() : null;
+  const diveArt = typeof Image !== 'undefined' ? new Image() : null;
+  if (diveArt) diveArt.src = './assets/goalkeeper-dive-frames.png';
   if (cardArt) {
     cardArt.src = './assets/goalkeeper-models.png';
     cardArt.onload = () => document.querySelectorAll('.keeper-card__portrait').forEach(canvas =>
@@ -69,6 +71,21 @@
       ctx.drawImage(cardArt, sourceX, sourceY, frameSize, frameSize, left, top, frameSize * spriteScale, frameSize * spriteScale);
       ctx.restore();
     };
+    const drawDivePose = (frame, alpha, offsetY = 0) => {
+      if (alpha <= .01 || !diveArt?.complete || !diveArt.naturalWidth) return;
+      const anchorX = x + contactOffsetX;
+      const anchorY = y - 28 + contactOffsetY + offsetY;
+      const left = anchorX - frameSize * spriteScale / 2;
+      const top = anchorY - frameSize * spriteScale / 2;
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      ctx.translate(anchorX, anchorY);
+      ctx.rotate(direction * -.035);
+      ctx.translate(-anchorX, -anchorY);
+      ctx.drawImage(diveArt, frame * frameSize, p.artIndex * frameSize, frameSize, frameSize,
+        left, top, frameSize * spriteScale, frameSize * spriteScale);
+      ctx.restore();
+    };
 
     ctx.save();
     ctx.globalAlpha = .42;
@@ -104,10 +121,32 @@
     }
 
     if (diving) {
-      const diveBlend = Math.min(1, motion / .16);
-      drawPose(1, 1 - diveBlend, 0, -2, direction * -.025);
-      if (motion > .12) drawPose(diveFrame, .1 * (1 - motion), -direction * 20, 6, direction * -.04);
-      drawPose(diveFrame, diveBlend, 0, -Math.sin(motion * Math.PI) * 5, direction * -.035);
+      if (diveArt?.complete && diveArt.naturalWidth && direction) {
+        // Each keeper has three illustrated transition poses per side. Keep
+        // them as distinct animation frames; blending every pose made a visible
+        // double image. Only blend into the first and final poses.
+        const poseBlend = Math.min(1, motion / .13);
+        const firstFrame = direction < 0 ? 0 : 3;
+        const settle = -Math.sin(motion * Math.PI) * 5;
+        drawPose(1, 1 - poseBlend, 0, -2, direction * -.025);
+        if (motion < .8) {
+          const phase = Math.max(0, (motion - .13) / .67) * 3;
+          const stage = Math.min(2, Math.floor(phase));
+          const fadeToNext = stage === 2 ? 0 : Math.max(0, (phase - stage - .84) / .16);
+          drawDivePose(firstFrame + stage, poseBlend * (1 - fadeToNext), settle);
+          if (fadeToNext > 0) drawDivePose(firstFrame + stage + 1, poseBlend * fadeToNext, settle);
+        } else {
+          const finish = Math.min(1, (motion - .8) / .12);
+          drawDivePose(firstFrame + 2, poseBlend * (1 - finish), settle);
+          drawPose(diveFrame, poseBlend * finish, 0, settle, direction * -.035);
+        }
+      } else {
+        // Keep the original art animation as a fallback while the atlas loads.
+        const diveBlend = Math.min(1, motion / .16);
+        drawPose(1, 1 - diveBlend, 0, -2, direction * -.025);
+        if (motion > .12) drawPose(diveFrame, .1 * (1-motion), -direction * 20, 6, direction * -.04);
+        drawPose(diveFrame, diveBlend, 0, -Math.sin(motion * Math.PI) * 5, direction * -.035);
+      }
     } else if (landing > 0) {
       drawPose(diveFrame, landing, 0, 0, diveRotation * .035 * landing);
       drawPose(0, 1 - landing, 0, 0, 0);

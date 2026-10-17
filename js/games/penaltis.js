@@ -1276,13 +1276,9 @@ class PenaltisGame {
 
     this.beginKeeperRecovery();
 
-    if (!isGoal && turnRole === 'shooter') {
-      this.triggerFeedbackText('oooh... 💨', 'El portero adivinó tu disparo', '#f87171');
-    } else if (!isGoal && turnRole === 'goalkeeper') {
-      this.triggerFeedbackText('¡PARADÓN! 🧤⚡', '¡Reflejos magistrales bajo palos!', '#38bdf8');
-    } else if (isGoal) {
-      this.feedbackAlpha = 0;
-    }
+    this.feedbackAlpha = 0;
+    this.feedbackTitle = '';
+    this.feedbackSubtext = '';
   }
 
   resolveAnimePenalty() {
@@ -1308,7 +1304,9 @@ class PenaltisGame {
       window.soundManager.playCatch();
       window.soundManager.playCrowdGroan();
 
-      this.triggerFeedbackText('¡PARADÓN! 🧤', 'El portero adivinó la dirección del tiro.', '#38bdf8');
+      this.feedbackAlpha = 0;
+      this.feedbackTitle = '';
+      this.feedbackSubtext = '';
     } else {
       this.score += 100 + this.streak * 25;
       this.streak++;
@@ -1489,15 +1487,6 @@ class PenaltisGame {
     ctx.restore();
   }
 
-  triggerFeedbackText(title, subtitle, color) {
-    this.feedbackTitle = title;
-    this.feedbackSubtext = subtitle;
-    this.feedbackColor = color;
-    this.feedbackAlpha = 1;
-    this.feedbackAge = 0;
-    this.feedbackScale = 0.72;
-  }
-
   resetNextShot() {
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
@@ -1590,7 +1579,6 @@ class PenaltisGame {
       this.renderAnimeAimArrow(ctx);
     }
 
-    this.renderMangaBanner(ctx);
 
     ctx.restore();
 
@@ -2645,84 +2633,6 @@ class PenaltisGame {
     ctx.restore();
   }
 
-  renderMangaBanner(ctx) {
-    if (this.feedbackAlpha <= 0) return;
-    const age = this.feedbackAge || 0;
-    const burstProgress = Math.min(1, age / 0.52);
-    ctx.save();
-    ctx.translate(200, 285);
-    ctx.scale(this.feedbackScale, this.feedbackScale);
-    ctx.globalAlpha = Math.max(0, this.feedbackAlpha);
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha *= 0.72 * (1 - burstProgress);
-    ctx.rotate(age * 0.7);
-    ctx.beginPath();
-    ctx.arc(0, 0, 44 + burstProgress * 122, 0, Math.PI * 2);
-    ctx.strokeStyle = this.feedbackColor;
-    ctx.lineWidth = 8 * (1 - burstProgress) + 1;
-    ctx.shadowColor = this.feedbackColor;
-    ctx.shadowBlur = 24;
-    ctx.stroke();
-    for (let ray = 0; ray < 14; ray++) {
-      const angle = (Math.PI * 2 * ray) / 14 + age * 0.35;
-      const inner = 112 + (ray % 3) * 9;
-      const outer = inner + 28 + (1 - burstProgress) * 28;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
-      ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
-      ctx.lineWidth = ray % 2 ? 2 : 4;
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    ctx.save();
-    ctx.rotate(-0.035);
-    ctx.shadowColor = this.feedbackColor;
-    ctx.shadowBlur = 24;
-    const plate = ctx.createLinearGradient(0, -38, 0, 40);
-    plate.addColorStop(0, 'rgba(17, 31, 49, 0.97)');
-    plate.addColorStop(0.55, 'rgba(3, 12, 25, 0.97)');
-    plate.addColorStop(1, 'rgba(9, 20, 35, 0.97)');
-    ctx.fillStyle = plate;
-    ctx.beginPath();
-    ctx.moveTo(-166, -38); ctx.lineTo(166, -38); ctx.lineTo(182, -22);
-    ctx.lineTo(182, 23); ctx.lineTo(166, 39); ctx.lineTo(-166, 39);
-    ctx.lineTo(-182, 23); ctx.lineTo(-182, -22); ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = this.feedbackColor;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha *= 0.7;
-    ctx.fillStyle = this.feedbackColor;
-    ctx.beginPath();
-    ctx.moveTo(-176, -25); ctx.lineTo(-166, -35); ctx.lineTo(-166, -12); ctx.lineTo(-176, -3); ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(176, 25); ctx.lineTo(166, 35); ctx.lineTo(166, 12); ctx.lineTo(176, 3); ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha /= 0.7;
-
-    ctx.fillStyle = this.feedbackColor;
-    ctx.shadowColor = this.feedbackColor;
-    ctx.shadowBlur = 16;
-    ctx.font = '900 31px "Barlow Condensed", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(this.feedbackTitle, 0, -9, 320);
-
-    if (this.feedbackSubtext) {
-      ctx.fillStyle = '#f8fafc';
-      ctx.shadowBlur = 0;
-      ctx.font = '700 11px "Chakra Petch", sans-serif';
-      ctx.fillText(this.feedbackSubtext, 0, 17, 320);
-    }
-    ctx.restore();
-    ctx.restore();
-  }
 }
 
 window.PenaltisGame = PenaltisGame;
