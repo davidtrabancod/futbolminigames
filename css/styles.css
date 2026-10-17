@@ -1986,7 +1986,18 @@ body {
     radial-gradient(circle at 25% 77%, rgba(255, 255, 255, 0.55) 0 1px, transparent 2px),
     radial-gradient(circle at 76% 69%, rgba(255, 210, 83, 0.7) 0 1px, transparent 2px);
   content: "";
-  animation: resultSparkle 3s ease-in-out infinite alternate;
+  animation: none;
+}
+
+/* The match recap is a still screen: freeze the hidden match scene behind it
+   and keep the result panel, decorative lights, and emblem from pulsing. */
+.online-match.is-result,
+.online-match.is-result *,
+.online-result:not(.hidden),
+.online-result:not(.hidden) *,
+.online-result:not(.hidden)::before {
+  animation: none !important;
+  transition: none !important;
 }
 
 .online-result > * { position: relative; z-index: 1; }

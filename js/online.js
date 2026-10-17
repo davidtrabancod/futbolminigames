@@ -725,7 +725,10 @@ class OnlineArena {
       this.app.gameScreen.style.display = 'flex';
     }
     this.app.resizeCanvas?.();
-    if (this.refs.onlineMatchScreen) this.refs.onlineMatchScreen.classList.add('hidden');
+    if (this.refs.onlineMatchScreen) {
+      this.refs.onlineMatchScreen.classList.add('hidden');
+      this.refs.onlineMatchScreen.classList.remove('is-result');
+    }
     this.refs.forfeitOnlineBtn.classList.remove('hidden');
     document.getElementById('pauseBtn')?.classList.add('hidden');
     this.refs.onlineMatchResult.classList.add('hidden');
@@ -909,6 +912,7 @@ class OnlineArena {
     this.refs.onlineMatchResult.classList.add(won ? 'is-win' : draw ? 'is-draw' : 'is-loss');
     this.refs.onlineMatchResult.style.display = 'flex';
     this.refs.onlineMatchScreen.classList.remove('hidden');
+    this.refs.onlineMatchScreen.classList.add('is-result');
     this.refs.forfeitOnlineBtn.classList.add('hidden');
 
     this.refs.onlineResultMode.textContent = ranked ? 'PARTIDA CLASIFICATORIA' : normal ? 'PARTIDA NORMAL' : 'PARTIDA AMISTOSA';

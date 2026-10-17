@@ -684,7 +684,9 @@ class PenaltisGame {
 
     const chosenZone = this.TARGET_ZONES.find(z => z.id === keeperChoiceId) || this.TARGET_ZONES[2];
     this.keeper.diveZoneId = keeperChoiceId;
-    this.keeper.diveDirection = Math.sign(chosenZone.x - this.keeper.baseX) || 1;
+    // The center target has no horizontal side. Forcing it to +1 sent the
+    // keeper anchor left while selecting the right-dive sprite pose.
+    this.keeper.diveDirection = Math.sign(chosenZone.x - this.keeper.baseX);
     // The detailed sprite's glove is high and wide from its foot anchor; the
     // canvas fallback uses a compact, rotated body with gloves near its pivot.
     const detailedKeeper = this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER;
