@@ -385,7 +385,7 @@ class PenaltisGame {
 
   renderOnlineScoreboardOverlay(ctx) {
     ctx.save();
-    const boxX = 168, boxY = 8, boxW = 624, boxH = 74;
+    const boxX = 135, boxY = 4, boxW = 690, boxH = 78;
     const centerX = boxX + boxW / 2;
     const myName = (this.onlineMyName || 'TU').toUpperCase();
     const oppName = (this.onlineOppName || 'RIVAL').toUpperCase();
@@ -435,18 +435,34 @@ class PenaltisGame {
     panelPath(4);
     ctx.stroke();
 
+    // Opposing team colors sit beneath the glass surface.
+    ctx.save();
+    panelPath(3);
+    ctx.clip();
+    const leftWash = ctx.createLinearGradient(boxX, 0, centerX, 0);
+    leftWash.addColorStop(0, 'rgba(0, 203, 255, .2)');
+    leftWash.addColorStop(1, 'rgba(0, 203, 255, 0)');
+    ctx.fillStyle = leftWash;
+    ctx.fillRect(boxX, boxY, boxW / 2, boxH);
+    const rightWash = ctx.createLinearGradient(boxX + boxW, 0, centerX, 0);
+    rightWash.addColorStop(0, 'rgba(255, 55, 100, .2)');
+    rightWash.addColorStop(1, 'rgba(255, 55, 100, 0)');
+    ctx.fillStyle = rightWash;
+    ctx.fillRect(centerX, boxY, boxW / 2, boxH);
+    ctx.restore();
+
     // Team-colored light rails frame the two score columns.
     const rail = (x, color, direction) => {
       const gradient = ctx.createLinearGradient(x, 0, x + direction * 150, 0);
       gradient.addColorStop(0, color);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
-      ctx.fillRect(x, boxY + 7, 150, 2);
+      ctx.fillRect(x, boxY + 6, 174, 3);
       ctx.save();
       ctx.shadowColor = color;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 16;
       ctx.fillStyle = color;
-      ctx.fillRect(x, boxY + 7, 34, 2);
+      ctx.fillRect(x, boxY + 6, 42, 3);
       ctx.restore();
     };
     rail(boxX + 8, '#32dcff', 1);
@@ -474,8 +490,12 @@ class PenaltisGame {
     ctx.fillStyle = 'rgba(6, 22, 32, .96)';
     ctx.strokeStyle = 'rgba(255, 214, 102, .78)';
     ctx.lineWidth = 1.3;
+    ctx.save();
+    ctx.translate(centerX, boxY + 26);
+    ctx.rotate(Math.sin(this.timer * 1.8) * .08);
     ctx.beginPath();
-    ctx.arc(centerX, boxY + 24, 14, 0, Math.PI * 2);
+    ctx.moveTo(0, -18); ctx.lineTo(18, 0); ctx.lineTo(0, 18); ctx.lineTo(-18, 0);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
     ctx.shadowColor = '#ffd866';
@@ -484,20 +504,21 @@ class PenaltisGame {
     ctx.font = '800 9px Bungee, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('VS', centerX, boxY + 24);
+    ctx.fillText('VS', 0, 0);
     ctx.shadowBlur = 0;
+    ctx.restore();
 
     // Player names and large score digits.
-    ctx.font = '700 10px "Chakra Petch", sans-serif';
+    ctx.font = '700 12px "Chakra Petch", sans-serif';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#8deeff';
     ctx.shadowColor = '#20cfff';
     ctx.shadowBlur = 8;
-    ctx.fillText(myName, boxX + 190, boxY + 20, 210);
+    ctx.fillText(myName, boxX + 208, boxY + 20, 230);
     ctx.fillStyle = '#ffadbd';
     ctx.shadowColor = '#ff4e77';
-    ctx.fillText(oppName, boxX + boxW - 190, boxY + 20, 210);
+    ctx.fillText(oppName, boxX + boxW - 208, boxY + 20, 230);
     ctx.shadowBlur = 0;
 
     const drawScore = (score, x, color, pulseStart) => {
@@ -507,9 +528,9 @@ class PenaltisGame {
         if (age >= 0 && age < .55) scale += Math.sin((1 - age / .55) * Math.PI) * .2;
       }
       ctx.save();
-      ctx.translate(x, boxY + 50);
+      ctx.translate(x, boxY + 54);
       ctx.scale(scale, scale);
-      ctx.font = '900 49px "Barlow Condensed", sans-serif';
+      ctx.font = 'italic 900 59px "Barlow Condensed", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.lineWidth = 3;
@@ -525,30 +546,30 @@ class PenaltisGame {
     if (this._scoreboardOppScore !== undefined && this._scoreboardOppScore !== oppScore) this._scorePulseOpp = this.timer;
     this._scoreboardMyScore = myScore;
     this._scoreboardOppScore = oppScore;
-    drawScore(myScore, boxX + 190, '#25d9ff', this._scorePulseMy);
-    drawScore(oppScore, boxX + boxW - 190, '#ff5478', this._scorePulseOpp);
+    drawScore(myScore, boxX + 208, '#25d9ff', this._scorePulseMy);
+    drawScore(oppScore, boxX + boxW - 208, '#ff5478', this._scorePulseOpp);
 
-    const suddenDeathLabel = roundLabel.includes('SÚBITA');
-    const roundWidth = suddenDeathLabel ? 132 : 112;
+    const suddenDeathLabel = suddenDeath;
+    const roundWidth = suddenDeathLabel ? 142 : 126;
     ctx.fillStyle = suddenDeathLabel ? 'rgba(88, 54, 12, .94)' : 'rgba(8, 36, 49, .96)';
     ctx.strokeStyle = suddenDeathLabel ? 'rgba(255, 202, 89, .88)' : 'rgba(86, 224, 242, .62)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(centerX - roundWidth / 2, boxY + 52, roundWidth, 17, 8);
+    ctx.roundRect(centerX - roundWidth / 2, boxY + 61, roundWidth, 17, 8);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = suddenDeathLabel ? '#ffe08b' : '#8beaf4';
     ctx.font = '800 11px "Chakra Petch", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(roundLabel, centerX, boxY + 60.5, roundWidth - 10);
+    ctx.fillText(roundLabel, centerX, boxY + 69.5, roundWidth - 10);
 
     // Attempt lights; the sudden-death attempt has a gold rim.
     const drawAttempts = (history, startX, direction) => {
       const count = suddenDeath ? 4 : 3;
       for (let i = 0; i < count; i++) {
-        const x = startX + direction * i * 18;
-        const y = boxY + 65;
+        const x = startX + direction * i * 20;
+        const y = boxY + 72;
         const result = history[i];
         const color = result === 'goal' ? '#4cff9b' : result === 'saved' ? '#ff526e' : '#78909b';
         ctx.save();
@@ -564,8 +585,8 @@ class PenaltisGame {
         ctx.restore();
       }
     };
-    drawAttempts(myHistory, boxX + 28, 1);
-    drawAttempts(oppHistory, boxX + boxW - 28, -1);
+    drawAttempts(myHistory, boxX + 34, 1);
+    drawAttempts(oppHistory, boxX + boxW - 34, -1);
     ctx.restore();
   }
 
