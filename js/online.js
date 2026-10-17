@@ -45,7 +45,9 @@ class OnlineArena {
       matchmakingBanner: document.getElementById('matchmakingBanner'),
       matchIntro: document.getElementById('matchIntro'),
       matchIntroYou: document.getElementById('matchIntroYou'),
+      matchIntroYouCrest: document.getElementById('matchIntroYouCrest'),
       matchIntroOpponent: document.getElementById('matchIntroOpponent'),
+      matchIntroOpponentCrest: document.getElementById('matchIntroOpponentCrest'),
       goalkeeperRoster: document.getElementById('goalkeeperRoster'),
       goalkeeperSelectionStatus: document.getElementById('goalkeeperSelectionStatus'),
       featuredKeeperPortrait: document.getElementById('featuredKeeperPortrait'),
@@ -571,8 +573,12 @@ class OnlineArena {
     const intro = this.refs.matchIntro;
     if (!intro) return;
     this.clearMatchIntro();
-    this.refs.matchIntroYou.textContent = youName || 'TÚ';
-    this.refs.matchIntroOpponent.textContent = opponentName || 'RIVAL';
+    const playerName = String(youName || 'TÚ').trim() || 'TÚ';
+    const rivalName = String(opponentName || 'RIVAL').trim() || 'RIVAL';
+    this.refs.matchIntroYou.textContent = playerName;
+    this.refs.matchIntroOpponent.textContent = rivalName;
+    this.refs.matchIntroYouCrest.textContent = this.getMatchInitials(playerName);
+    this.refs.matchIntroOpponentCrest.textContent = this.getMatchInitials(rivalName);
     intro.classList.remove('is-revealing', 'is-active');
     // Force a clean animation when a second match starts quickly.
     void intro.offsetWidth;
@@ -582,6 +588,12 @@ class OnlineArena {
       intro.classList.add('is-revealing');
       this.matchIntroTimer = window.setTimeout(() => this.clearMatchIntro(), reducedMotion ? 80 : 1020);
     }, reducedMotion ? 40 : 1600);
+  }
+
+  getMatchInitials(name) {
+    const words = String(name).trim().split(/\s+/u).filter(Boolean);
+    if (words.length > 1) return `${Array.from(words[0])[0]}${Array.from(words[1])[0]}`.toLocaleUpperCase();
+    return Array.from(words[0] || 'PR').slice(0, 2).join('').toLocaleUpperCase();
   }
 
   clearMatchIntro() {
