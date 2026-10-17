@@ -35,12 +35,17 @@ class PenaltisGame {
 
     this.vWidth = 400;
     this.vHeight = 600;
+    // A slightly longer focal length brings the complete goal closer in the
+    // camera while preserving its width-to-height ratio and net proportions.
+    this.goalViewScale = 1.14;
+    this.goalPixelsPerMeterX = 43.8 * this.goalViewScale;
+    this.goalPixelsPerMeterY = 65.6 * this.goalViewScale;
     this.netDepth = 1.88;
     this.netPerspective = 1 / (1 + this.netDepth / 26.6);
     this.netGroundY = 287 + (310 - 287) * this.netPerspective;
     const targetOnNet = (worldX, worldY) => ({
-      x: 200 + (worldX - 3.66) * 43.8 * this.netPerspective,
-      y: this.netGroundY - worldY * 65.6 * this.netPerspective
+      x: 200 + (worldX - 3.66) * this.goalPixelsPerMeterX * this.netPerspective,
+      y: this.netGroundY - worldY * this.goalPixelsPerMeterY * this.netPerspective
     });
 
     // Las 5 Zonas de Disparo Táctico
@@ -701,8 +706,8 @@ class PenaltisGame {
     const perspective = 1 / (1 + Math.max(0, state.z) / 26.6);
     const groundY = 517.2 + (this.netGroundY - 517.2) * depthRatio;
     return {
-      x: 200 + state.x * 43.8 * perspective,
-      y: groundY - state.y * 65.6 * perspective,
+      x: 200 + state.x * this.goalPixelsPerMeterX * perspective,
+      y: groundY - state.y * this.goalPixelsPerMeterY * perspective,
       scale: perspective
     };
   }
@@ -760,8 +765,8 @@ class PenaltisGame {
     const targetDepth = this.netDepth;
     this.ball.physicsTargetDepth = targetDepth;
     const target = [
-      (zone.x - 200) / (43.8 * targetPerspective),
-      (this.netGroundY - zone.y) / (65.6 * targetPerspective),
+      (zone.x - 200) / (this.goalPixelsPerMeterX * targetPerspective),
+      (this.netGroundY - zone.y) / (this.goalPixelsPerMeterY * targetPerspective),
       targetDepth
     ];
     const spin = this.ball.spin;
@@ -1133,9 +1138,9 @@ class PenaltisGame {
   bulgeNet(impactX, impactY, physics = null) {
     const impactSpeed = physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 8;
     const hitX = Math.max(0, Math.min(7.32,
-      3.66 + (impactX - 200) / (43.8 * this.netPerspective)));
+      3.66 + (impactX - 200) / (this.goalPixelsPerMeterX * this.netPerspective)));
     const hitY = Math.max(0, Math.min(2.44,
-      (this.netGroundY - impactY) / (65.6 * this.netPerspective)));
+      (this.netGroundY - impactY) / (this.goalPixelsPerMeterY * this.netPerspective)));
     const impulse = Math.max(2, Math.min(12, impactSpeed * .8));
     this.netImpactPoint = { x: hitX, y: hitY };
     for (let r = 0; r <= this.netRows; r++) {
@@ -1977,8 +1982,8 @@ class PenaltisGame {
     const perspective = 1 / (1 + d / 26.6);
     return {
       // Match the compressed field's vanishing point and goal-line height.
-      x: 200 + (x - 3.66) * 43.8 * perspective,
-      y: 287 + (310 - y * 65.6 - 287) * perspective
+      x: 200 + (x - 3.66) * this.goalPixelsPerMeterX * perspective,
+      y: 287 + (310 - y * this.goalPixelsPerMeterY - 287) * perspective
     };
   }
 

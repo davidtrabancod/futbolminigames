@@ -40,8 +40,8 @@ class Goal3DRenderer {
         // vanishing point so the rear net follows the grass perspective.
         float depth = max(-aPosition.z, 0.0);
         float perspective = 1.0 / (1.0 + depth / 26.6);
-        float px = 200.0 + aPosition.x * 43.8 * perspective;
-        float frontY = 310.0 - aPosition.y * 65.6;
+        float px = 200.0 + aPosition.x * 49.932 * perspective;
+        float frontY = 310.0 - aPosition.y * 74.784;
         float py = 287.0 + (frontY - 287.0) * perspective;
         gl_Position = vec4(px / 200.0 - 1.0, 1.0 - py / 300.0,
                            0.45 - aPosition.z * 0.025, 1.0);
