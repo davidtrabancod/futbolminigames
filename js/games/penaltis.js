@@ -43,6 +43,7 @@ class PenaltisGame {
     this.netDepth = 1.88;
     this.netPerspective = 1 / (1 + this.netDepth / 26.6);
     this.netGroundY = 287 + (310 - 287) * this.netPerspective;
+    this.keeperRecoveryDuration = 1.2;
     const targetOnNet = (worldX, worldY) => ({
       x: 200 + (worldX - 3.66) * this.goalPixelsPerMeterX * this.netPerspective,
       y: this.netGroundY - worldY * this.goalPixelsPerMeterY * this.netPerspective
@@ -156,7 +157,8 @@ class PenaltisGame {
       return;
     }
     this.pendingOnlineTurn = null;
-    const recoveringKeeper = ['saved', 'beaten'].includes(this.keeper.state) && this.keeper.landingTimer < 0.58;
+    const recoveringKeeper = ['saved', 'beaten'].includes(this.keeper.state)
+      && this.keeper.landingTimer < this.keeperRecoveryDuration;
     this.onlineRole = turnMessage.role === 'shooter' ? 'lanzador' : 'portero';
     this.state = 'aiming';
     this.activeZone = null;
@@ -167,6 +169,7 @@ class PenaltisGame {
     this.ball.isDeflected = false;
     this.ball.physicsState = null;
     this.ball.physicsAccumulator = 0;
+    this.ball.deflectStartScale = 1;
     this.ball.netAccumulator = 0;
     this.ball.deflectAccumulator = 0;
     this.ball.scale = 1;
@@ -293,6 +296,9 @@ class PenaltisGame {
       diveDirection: 0,
       diveStartX: 200,
       diveStartY: 270,
+      recoveryStartX: 200,
+      recoveryStartY: 270,
+      recoveryStartRotation: 0,
       anticipating: false,
       catchContactTimer: 0,
       diveSpeed: lvl.diveSpeed,
@@ -308,6 +314,7 @@ class PenaltisGame {
       y: 510,
       radius: 29,
       scale: 1.0,
+      deflectStartScale: 1.0,
       targetX: 200,
       targetY: 200,
       progress: 0,
@@ -636,6 +643,15 @@ class PenaltisGame {
     this.launchAnimeShot(zone);
   }
 
+  beginKeeperRecovery() {
+    const keeper = this.keeper;
+    keeper.recovering = true;
+    keeper.landingTimer = 0;
+    keeper.recoveryStartX = keeper.x;
+    keeper.recoveryStartY = keeper.y;
+    keeper.recoveryStartRotation = keeper.rotation;
+  }
+
   launchAnimeShot(zone, keeperChoiceId = null) {
     this.feedbackAlpha = 0;
     this.feedbackAge = 0;
@@ -645,6 +661,8 @@ class PenaltisGame {
     this.ball.inFlight = true;
     this.ball.inNet = false;
     this.ball.progress = 0;
+    this.ball.scale = 1;
+    this.ball.deflectStartScale = 1;
     this.ball.targetX = zone.x;
     this.ball.targetY = zone.y;
     this.ball.selectedZone = zone;
@@ -699,7 +717,18 @@ class PenaltisGame {
     this.keeper.landingTimer = 0;
     this.keeper.anticipating = false;
     this.keeper.recovering = false;
+    this.keeper.diving = false;
+    this.keeper.state = 'idle';
     this.keeper.rotation = 0;
+  }
+
+  projectBallScale(depth) {
+    const targetDepth = Math.max(.001, this.ball.physicsTargetDepth || this.netDepth);
+    const depthRatio = Math.max(0, Math.min(1, Math.max(0, depth) / targetDepth));
+    const perspective = 1 / (1 + Math.max(0, depth) / 26.6);
+    // The stadium plate compresses physical depth, so give the ball a stronger
+    // size cue as it travels away from the camera toward the goal plane.
+    return perspective * (1 - .44 * depthRatio);
   }
 
   projectBallPhysics(state) {
@@ -710,7 +739,7 @@ class PenaltisGame {
     return {
       x: 200 + state.x * this.goalPixelsPerMeterX * perspective,
       y: groundY - state.y * this.goalPixelsPerMeterY * perspective,
-      scale: perspective
+      scale: this.projectBallScale(state.z)
     };
   }
 
@@ -827,7 +856,7 @@ class PenaltisGame {
       ball.progress = 1;
       ball.x = ball.targetX;
       ball.y = ball.targetY;
-      ball.scale = 1 / (1 + (this.ball.physicsTargetDepth / 26.6));
+      ball.scale = this.projectBallScale(this.ball.physicsTargetDepth);
     }
   }
 
@@ -875,24 +904,27 @@ class PenaltisGame {
 
     this.updateGoalFlares(dt);
 
-    if (this.state === 'aiming') {
-      this.keeper.idleTimer += dt;
-      if (this.keeper.recovering && this.keeper.catchContactTimer <= 0) {
-        this.keeper.landingTimer += dt;
-        const recovery = Math.min(1, this.keeper.landingTimer / .58);
-        this.keeper.x += (this.keeper.baseX - this.keeper.x) * Math.min(1, dt * 5);
-        this.keeper.y += (this.keeper.baseY - this.keeper.y) * Math.min(1, dt * 5);
-        this.keeper.rotation *= Math.exp(-dt * 7);
-        if (recovery >= 1) {
-          this.keeper.recovering = false;
-          this.keeper.state = 'idle';
-          this.keeper.rotation = 0;
-          this.keeper.diveDirection = 0;
+    if (this.keeper.recovering) {
+      if (this.keeper.catchContactTimer <= 0) {
+        const keeper = this.keeper;
+        keeper.diving = false;
+        keeper.landingTimer += dt;
+        const progress = Math.min(1, keeper.landingTimer / this.keeperRecoveryDuration);
+        const eased = progress * progress * (3 - 2 * progress);
+        keeper.x = keeper.recoveryStartX + (keeper.baseX - keeper.recoveryStartX) * eased;
+        keeper.y = keeper.recoveryStartY + (keeper.baseY - keeper.recoveryStartY) * eased;
+        keeper.rotation = keeper.recoveryStartRotation * (1 - eased);
+        if (progress >= 1) {
+          keeper.recovering = false;
+          keeper.state = 'idle';
+          keeper.rotation = 0;
+          keeper.diveDirection = 0;
         }
-      } else {
-        this.keeper.x = this.keeper.baseX + Math.sin(this.keeper.idleTimer * 1.4) * 3.5;
-        this.keeper.y = this.keeper.baseY + Math.abs(Math.cos(this.keeper.idleTimer * 2.1)) * 1.8;
       }
+    } else if (this.state === 'aiming') {
+      this.keeper.idleTimer += dt;
+      this.keeper.x = this.keeper.baseX + Math.sin(this.keeper.idleTimer * 1.4) * 3.5;
+      this.keeper.y = this.keeper.baseY + Math.abs(Math.cos(this.keeper.idleTimer * 2.1)) * 1.8;
       this.keeper.anticipating = false;
 
       if (Math.random() < 0.35) {
@@ -963,7 +995,7 @@ class PenaltisGame {
             this.pendingOnlineTurn = null;
             // Let the save/impact read on screen before the next online turn
             // resets the ball and keeper to their ready positions.
-            setTimeout(() => this.setOnlineTurn(nextTurn), 700);
+            setTimeout(() => this.setOnlineTurn(nextTurn), this.keeperRecoveryDuration * 1000);
           }
         }
       }
@@ -1033,17 +1065,8 @@ class PenaltisGame {
           ball.spin *= Math.exp(-.9 * step);
           ball.deflectAccumulator -= step;
         }
-        ball.scale = Math.min(1, this.netPerspective + ball.deflectAge * .1);
+        ball.scale = Math.min(1, ball.deflectStartScale + ball.deflectAge * .34);
         if (ball.deflectAge > .9 || ball.y > 410) ball.isDeflected = false;
-      }
-    }
-
-    if (this.isOnlineMode && this.keeper.catchContactTimer <= 0 && !this.ball.inFlight && ['saved', 'beaten'].includes(this.keeper.state)) {
-      this.keeper.recovering = true;
-      if (this.state !== 'aiming') this.keeper.landingTimer += dt;
-      if (this.keeper.landingTimer > .58) {
-        this.keeper.recovering = false;
-        this.keeper.state = 'idle';
       }
     }
 
@@ -1166,7 +1189,7 @@ class PenaltisGame {
       this.ball.x = this.ball.selectedZone.x;
       this.ball.y = this.ball.selectedZone.y;
     }
-    this.ball.scale = this.netPerspective;
+    this.ball.scale = this.projectBallScale(this.netDepth);
     this.camera.shake = 0;
     this.camera.targetZoom = 1.0;
 
@@ -1199,6 +1222,8 @@ class PenaltisGame {
       window.soundManager.playCatch();
       window.soundManager.playCrowdGroan();
     }
+
+    this.beginKeeperRecovery();
 
     if (!isGoal && turnRole === 'shooter') {
       this.triggerFeedbackText('oooh... 💨', 'El portero adivinó tu disparo', '#f87171');
@@ -1240,6 +1265,8 @@ class PenaltisGame {
       this.triggerAnimeGoal();
     }
 
+    this.beginKeeperRecovery();
+
     if (this.app && this.app.updateHUD) {
       this.app.updateHUD({
         score: this.score,
@@ -1265,7 +1292,7 @@ class PenaltisGame {
     this.ball.inNet = true;
     this.ball.netAge = 0;
     this.ball.netAccumulator = 0;
-    this.ball.scale = this.netPerspective;
+    this.ball.scale = this.projectBallScale(this.netDepth);
     this.ball.velocityX = Math.max(-28, Math.min(28, this.ball.flightVX * .055));
     this.ball.velocityY = Math.max(-30, Math.min(30, this.ball.flightVY * .055));
     this.ball.result = 'goal';
@@ -1287,6 +1314,7 @@ class PenaltisGame {
   deflectBallFromKeeper() {
     this.ball.isDeflected = true;
     this.ball.deflectAge = 0;
+    this.ball.deflectStartScale = this.ball.scale;
     // Keep the ball pinned to the keeper's palms for several rendered frames
     // so the impact reads clearly before the rebound begins.
     this.ball.contactHold = .095;
@@ -1395,7 +1423,8 @@ class PenaltisGame {
   resetNextShot() {
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
-    this.ball.scale = 1.0;
+    this.ball.scale = 1;
+    this.ball.deflectStartScale = 1;
     this.ball.progress = 0;
     this.ball.result = null;
     this.ball.inFlight = false;

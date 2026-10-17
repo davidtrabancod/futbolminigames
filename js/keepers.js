@@ -32,7 +32,7 @@
     const spriteScale = scale * .68;
     const direction = diveDirection || Math.sign(diveRotation);
     const motion = Math.max(0, Math.min(1, diveProgress));
-    const landing = ['saved', 'beaten'].includes(keeperState) ? Math.max(0, 1 - landingTimer / .58) : 0;
+    const landing = ['saved', 'beaten'].includes(keeperState) ? Math.max(0, 1 - landingTimer / 1.2) : 0;
     const idlePhase = time * [1.2, 2.7, 1.1, .8, 1.9, 1.35, 1.05, .9][p.artIndex];
     const breath = Math.sin(idlePhase);
     const diveFrame = direction < 0 ? 2 : direction > 0 ? 3 : 1;
