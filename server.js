@@ -12,6 +12,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const DB_PATH = process.env.ARENA_DB_PATH || path.join(ROOT, 'data', 'arena.sqlite');
 const ACTION_TIMEOUT_MS = 45_000;
 const INVITE_TTL_MS = 30 * 60 * 1000;
+const REMATCH_TTL_MS = 60_000;
 const MAX_BODY_BYTES = 16 * 1024;
 const STATIC_EXTENSIONS = new Set(['.html', '.css', '.js', '.svg', '.webmanifest', '.json', '.png', '.jpg', '.jpeg', '.ico', '.txt', '.xml']);
 const database = new ArenaDatabase(DB_PATH);
@@ -19,6 +20,8 @@ const database = new ArenaDatabase(DB_PATH);
 const queue = [];
 const inviteRooms = new Map();
 const matches = new Map();
+const finishedFriendlyMatches = new Map();
+const friendlyRematchRequests = new Map();
 const clientsByUser = new Map();
 const authAttempts = new Map();
 
@@ -367,6 +370,11 @@ function finishMatch(match, winnerIndex, reason) {
   clearTimeout(match.turnTimer);
   clearTimeout(match.botTimer);
   matches.delete(match.id);
+  if (match.mode === 'friendly') {
+    const finished = { players: match.players };
+    finished.timer = setTimeout(() => finishedFriendlyMatches.delete(match.id), INVITE_TTL_MS);
+    finishedFriendlyMatches.set(match.id, finished);
+  }
   const ratings = database.saveMatch({
     id: match.id,
     mode: match.mode,
@@ -404,6 +412,59 @@ function handleSocketMessage(ws, rawData) {
   }
   if (!message || typeof message.type !== 'string') {
     sendSocket(ws, { type: 'error', message: 'Mensaje no válido.' });
+    return;
+  }
+
+  if (message.type === 'friendly-rematch') {
+    const originalMatchId = typeof message.matchId === 'string' ? message.matchId : '';
+    const finished = finishedFriendlyMatches.get(originalMatchId);
+    if (!finished || !finished.players.some(player => player.id === ws.arenaUser.id)) {
+      sendSocket(ws, { type: 'error', message: 'La partida anterior ya no está disponible para revancha.' });
+      return;
+    }
+    if (ws.matchId || ws.queueState) {
+      sendSocket(ws, { type: 'error', message: 'Ya tienes otra partida o búsqueda en curso.' });
+      return;
+    }
+    let request = friendlyRematchRequests.get(originalMatchId);
+    if (!request) {
+      request = { userIds: new Set(), timer: null };
+      request.timer = setTimeout(() => {
+        friendlyRematchRequests.delete(originalMatchId);
+        for (const userId of request.userIds) {
+          const waitingSocket = clientsByUser.get(userId);
+          if (waitingSocket) sendSocket(waitingSocket, { type: 'rematch-expired', matchId: originalMatchId });
+        }
+      }, REMATCH_TTL_MS);
+      friendlyRematchRequests.set(originalMatchId, request);
+    }
+    request.userIds.add(ws.arenaUser.id);
+    if (request.userIds.size < 2) {
+      sendSocket(ws, { type: 'rematch-waiting', matchId: originalMatchId });
+      const opponent = finished.players.find(player => player.id !== ws.arenaUser.id);
+      const opponentSocket = opponent && clientsByUser.get(opponent.id);
+      if (opponentSocket) sendSocket(opponentSocket, { type: 'rematch-invited', matchId: originalMatchId });
+      return;
+    }
+    clearTimeout(request.timer);
+    friendlyRematchRequests.delete(originalMatchId);
+    clearTimeout(finished.timer);
+    finishedFriendlyMatches.delete(originalMatchId);
+    createMatch({ players: finished.players, mode: 'friendly' });
+    return;
+  }
+
+  if (message.type === 'friendly-rematch-cancel') {
+    const originalMatchId = typeof message.matchId === 'string' ? message.matchId : '';
+    const request = friendlyRematchRequests.get(originalMatchId);
+    if (request) {
+      request.userIds.delete(ws.arenaUser.id);
+      if (!request.userIds.size) {
+        clearTimeout(request.timer);
+        friendlyRematchRequests.delete(originalMatchId);
+      }
+    }
+    sendSocket(ws, { type: 'rematch-cancelled', matchId: originalMatchId });
     return;
   }
 

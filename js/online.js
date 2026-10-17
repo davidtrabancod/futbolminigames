@@ -12,6 +12,11 @@ class OnlineArena {
     this.matchId = null;
     this.matchEventCursor = 0;
     this.matchIntroTimer = null;
+    this.rematchPollTimer = null;
+    this.rematchRequestPromise = null;
+    this.rematchPending = false;
+    this.rematchWatching = false;
+    this.lastFinishedMatchId = null;
     this.authMode = 'login';
     this.selectedAvatar = '⚽';
     this.playerIndex = 0;
@@ -81,6 +86,7 @@ class OnlineArena {
       onlineShotResult: document.getElementById('onlineShotResult'),
       forfeitOnlineBtn: document.getElementById('forfeitOnlineBtn'),
       onlineMatchResult: document.getElementById('onlineMatchResult'),
+      onlinePlayAgainBtn: document.getElementById('onlinePlayAgainBtn'),
       onlineResultMode: document.getElementById('onlineResultMode'),
       onlineResultIcon: document.getElementById('onlineResultIcon'),
       onlineResultTitle: document.getElementById('onlineResultTitle'),
@@ -144,14 +150,17 @@ class OnlineArena {
         this.send({ type: 'forfeit' });
       }
     });
-    document.getElementById('onlinePlayAgainBtn').addEventListener('click', () => {
-      this.refs.onlineMatchResult.classList.add('hidden');
-      this.refs.onlineMatchResult.style.display = 'none';
-      if (this.currentMode === 'friendly') this.createFriendlyMatch();
-      else this.startRankedQueue();
+    this.refs.onlinePlayAgainBtn.addEventListener('click', () => {
+      if (this.currentMode === 'friendly') {
+        this.requestFriendlyRematch();
+        return;
+      }
+      this.hideOnlineResult();
+      this.startRankedQueue();
     });
-    document.getElementById('onlineReturnBtn').addEventListener('click', () => {
+    document.getElementById('onlineReturnBtn').addEventListener('click', async () => {
       this.matchActive = false;
+      if (await this.cancelFriendlyRematch()) return;
       this.app.goToMenu();
     });
   }
@@ -590,6 +599,144 @@ class OnlineArena {
     }, reducedMotion ? 40 : 1600);
   }
 
+  hideOnlineResult() {
+    this.refs.onlineMatchResult.classList.add('hidden');
+    this.refs.onlineMatchResult.style.display = 'none';
+  }
+
+  setRematchWaiting(waiting) {
+    const button = this.refs.onlinePlayAgainBtn;
+    const label = button?.querySelector('span');
+    if (button) button.disabled = waiting;
+    if (label) label.textContent = waiting ? 'ESPERANDO A TU AMIGO…' : 'JUGAR OTRA VEZ';
+    if (this.refs.onlineResultSummary && waiting) {
+      this.refs.onlineResultSummary.textContent = 'Revancha solicitada. Tu amigo entrará al partido cuando pulse «Jugar otra vez».';
+    }
+  }
+
+  setRematchInvited() {
+    const label = this.refs.onlinePlayAgainBtn?.querySelector('span');
+    if (this.refs.onlinePlayAgainBtn) this.refs.onlinePlayAgainBtn.disabled = false;
+    if (label) label.textContent = 'ACEPTAR REVANCHA';
+    if (this.refs.onlineResultSummary) this.refs.onlineResultSummary.textContent = 'Tu amigo quiere otra partida. Acepta la revancha para volver al campo.';
+  }
+
+  startFriendlyRematchWatch() {
+    if (!this.useServerlessMatchApi || this.currentMode !== 'friendly' || !this.lastFinishedMatchId) return;
+    this.stopFriendlyRematchPolling();
+    this.rematchWatching = true;
+    this.pollFriendlyRematchInvitation();
+  }
+
+  async pollFriendlyRematchInvitation() {
+    if (!this.rematchWatching || this.rematchPending) return;
+    try {
+      const response = await this.requestMatchApi({ action: 'rematch-poll', matchId: this.lastFinishedMatchId });
+      if (response.status === 'invited') {
+        this.rematchWatching = false;
+        this.setRematchInvited();
+        return;
+      }
+    } catch {}
+    if (this.rematchWatching) this.rematchPollTimer = window.setTimeout(() => this.pollFriendlyRematchInvitation(), 3000);
+  }
+
+  async requestFriendlyRematch() {
+    const originalMatchId = this.lastFinishedMatchId || this.matchId;
+    if (!originalMatchId) {
+      this.refs.onlineResultSummary.textContent = 'No se pudo recuperar la partida anterior. Vuelve al menú para crear otra amistosa.';
+      return;
+    }
+    if (this.rematchPending) return;
+    this.lastFinishedMatchId = originalMatchId;
+    this.rematchPending = true;
+    this.rematchWatching = false;
+    this.stopFriendlyRematchPolling();
+    this.setRematchWaiting(true);
+
+    if (!this.useServerlessMatchApi) {
+      if (!this.send({ type: 'friendly-rematch', matchId: originalMatchId })) {
+        this.rematchPending = false;
+        this.setRematchWaiting(false);
+        this.refs.onlineResultSummary.textContent = 'Se perdió la conexión. Vuelve a intentarlo.';
+      }
+      return;
+    }
+
+    try {
+      this.rematchRequestPromise = this.requestMatchApi({ action: 'rematch', matchId: originalMatchId });
+      const response = await this.rematchRequestPromise;
+      this.rematchRequestPromise = null;
+      if (response.status === 'matched' && response.matchId) {
+        this.startFriendlyRematch(response.matchId);
+        return;
+      }
+      this.pollFriendlyRematch();
+    } catch (error) {
+      this.rematchRequestPromise = null;
+      this.rematchPending = false;
+      this.setRematchWaiting(false);
+      this.refs.onlineResultSummary.textContent = error.message || 'No se pudo solicitar la revancha.';
+    }
+  }
+
+  startFriendlyRematch(matchId) {
+    this.rematchPending = false;
+    this.rematchWatching = false;
+    this.stopFriendlyRematchPolling();
+    this.hideOnlineResult();
+    this.currentMode = 'friendly';
+    this.startMatchPolling(matchId);
+  }
+
+  async pollFriendlyRematch() {
+    if (!this.rematchPending || !this.useServerlessMatchApi) return;
+    try {
+      const response = await this.requestMatchApi({ action: 'rematch-poll', matchId: this.lastFinishedMatchId });
+      if (response.status === 'matched' && response.matchId) {
+        this.startFriendlyRematch(response.matchId);
+        return;
+      }
+      if (response.status === 'expired') {
+        this.rematchPending = false;
+        this.stopFriendlyRematchPolling();
+        this.setRematchWaiting(false);
+        this.refs.onlineResultSummary.textContent = 'La solicitud de revancha caducó. Puedes volver a intentarlo.';
+        return;
+      }
+    } catch {
+      // Un fallo puntual de red no cancela la solicitud; se reintentará enseguida.
+    }
+    if (this.rematchPending) this.rematchPollTimer = window.setTimeout(() => this.pollFriendlyRematch(), 1500);
+  }
+
+  stopFriendlyRematchPolling() {
+    if (this.rematchPollTimer) window.clearTimeout(this.rematchPollTimer);
+    this.rematchPollTimer = null;
+  }
+
+  async cancelFriendlyRematch() {
+    this.rematchWatching = false;
+    this.stopFriendlyRematchPolling();
+    if (!this.rematchPending) return false;
+    this.rematchPending = false;
+    this.stopFriendlyRematchPolling();
+    if (this.useServerlessMatchApi) {
+      try {
+        await this.rematchRequestPromise?.catch(() => {});
+        const response = await this.requestMatchApi({ action: 'rematch-cancel', matchId: this.lastFinishedMatchId });
+        if (response.status === 'matched' && response.matchId) {
+          this.startFriendlyRematch(response.matchId);
+          return true;
+        }
+      } catch {}
+    } else {
+      this.send({ type: 'friendly-rematch-cancel', matchId: this.lastFinishedMatchId });
+    }
+    this.setRematchWaiting(false);
+    return false;
+  }
+
   getMatchInitials(name) {
     const words = String(name).trim().split(/\s+/u).filter(Boolean);
     if (words.length > 1) return `${Array.from(words[0])[0]}${Array.from(words[1])[0]}`.toLocaleUpperCase();
@@ -721,6 +868,12 @@ class OnlineArena {
         this.setOnlineStatus('Búsqueda cancelada. Puedes volver a buscar rival.');
         break;
       case 'error':
+        if (this.rematchPending) {
+          this.rematchPending = false;
+          this.stopFriendlyRematchPolling();
+          this.setRematchWaiting(false);
+          if (this.refs.onlineResultSummary) this.refs.onlineResultSummary.textContent = message.message || 'No se pudo solicitar la revancha.';
+        }
         this.resetOnlineControls();
         this.setOnlineStatus(message.message || 'No se pudo completar la acción.', 'error');
         break;
@@ -739,10 +892,32 @@ class OnlineArena {
       case 'match-end':
         this.showOnlineResult(message);
         break;
+      case 'rematch-waiting':
+        this.rematchWatching = false;
+        this.stopFriendlyRematchPolling();
+        this.rematchPending = true;
+        this.setRematchWaiting(true);
+        break;
+      case 'rematch-invited':
+        this.rematchWatching = false;
+        this.stopFriendlyRematchPolling();
+        this.setRematchInvited();
+        break;
+      case 'rematch-expired':
+        this.rematchPending = false;
+        this.rematchWatching = false;
+        this.stopFriendlyRematchPolling();
+        this.setRematchWaiting(false);
+        if (this.refs.onlineResultSummary) this.refs.onlineResultSummary.textContent = 'La solicitud de revancha caducó. Puedes volver a intentarlo.';
+        break;
     }
   }
 
   beginMatch(message) {
+    this.rematchPending = false;
+    this.rematchWatching = false;
+    this.stopFriendlyRematchPolling();
+    this.setRematchWaiting(false);
     if (this.pendingOnlineResultTimer) {
       window.clearTimeout(this.pendingOnlineResultTimer);
       this.pendingOnlineResultTimer = null;
@@ -972,6 +1147,11 @@ class OnlineArena {
       window.clearTimeout(this.pendingOnlineResultTimer);
       this.pendingOnlineResultTimer = null;
     }
+    this.lastFinishedMatchId = message.matchId || this.matchId;
+    this.rematchPending = false;
+    this.rematchWatching = false;
+    this.stopFriendlyRematchPolling();
+    this.setRematchWaiting(false);
     this.stopMatchPolling();
     this.matchActive = false;
     this.currentRole = null;
@@ -1036,6 +1216,7 @@ class OnlineArena {
     this.refs.onlineResultRecord.textContent = ranked ? `${record}${rank}` : updatedUser?.isGuest
       ? 'Crea una cuenta para competir en el ranking' : 'Esta partida no altera el ranking';
     this.loadLeaderboard();
+    if (message.mode === 'friendly') this.startFriendlyRematchWatch();
   }
 
   setStatus(msg, state = '') {}

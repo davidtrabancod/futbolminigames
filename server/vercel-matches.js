@@ -4,6 +4,7 @@ const { neon } = require('@neondatabase/serverless');
 const ACTION_TIMEOUT_MS = 45_000;
 const PRESENCE_TIMEOUT_MS = 90_000;
 const INVITE_TTL_MS = 30 * 60 * 1000;
+const REMATCH_TTL_MS = 60 * 1000;
 const ZONES = ['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right'];
 const MAX_BODY_BYTES = 16 * 1024;
 let schemaPromise;
@@ -118,6 +119,13 @@ async function ensureSchema(sql) {
         created_at BIGINT NOT NULL
       )`;
       await sql`CREATE INDEX IF NOT EXISTS online_match_events_delivery ON online_match_events(match_id, recipient_user_id, event_id)`;
+      await sql`CREATE TABLE IF NOT EXISTS online_match_rematches (
+        original_match_id TEXT NOT NULL REFERENCES online_matches(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        requested_at BIGINT NOT NULL,
+        rematch_match_id TEXT REFERENCES online_matches(id) ON DELETE SET NULL,
+        PRIMARY KEY (original_match_id, user_id)
+      )`;
 
       await sql`CREATE OR REPLACE FUNCTION arena_public_user(p_user_id INTEGER) RETURNS JSONB
         LANGUAGE SQL STABLE AS $function$
@@ -167,6 +175,41 @@ async function ensureSchema(sql) {
               'message', CASE WHEN i = 0 THEN 'Elige dónde lanzar.' ELSE 'Elige dónde cubrir la portería.' END
             ), (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT);
           END LOOP;
+        END
+        $function$`;
+
+      await sql`CREATE OR REPLACE FUNCTION arena_request_friendly_rematch(p_original_id TEXT, p_new_id TEXT, p_user_id INTEGER) RETURNS JSONB
+        LANGUAGE plpgsql AS $function$
+        DECLARE m online_matches%ROWTYPE; existing_rematch_id TEXT; request_count INTEGER; now_ms BIGINT;
+        BEGIN
+          SELECT * INTO m FROM online_matches WHERE id = p_original_id FOR UPDATE;
+          IF NOT FOUND OR m.mode <> 'friendly' OR m.state <> 'finished' THEN
+            RETURN jsonb_build_object('error', 'La partida amistosa ya no está disponible para revancha.');
+          END IF;
+          IF p_user_id NOT IN (m.player_one, m.player_two) THEN
+            RETURN jsonb_build_object('error', 'No participaste en esa partida.');
+          END IF;
+          now_ms := (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT;
+          DELETE FROM online_match_rematches WHERE original_match_id = p_original_id
+            AND rematch_match_id IS NULL AND requested_at < now_ms - 60000;
+          SELECT rematch_match_id INTO existing_rematch_id FROM online_match_rematches
+            WHERE original_match_id = p_original_id AND user_id = p_user_id;
+          IF existing_rematch_id IS NOT NULL THEN
+            RETURN jsonb_build_object('status', 'matched', 'matchId', existing_rematch_id);
+          END IF;
+          INSERT INTO online_match_rematches(original_match_id, user_id, requested_at)
+            VALUES (p_original_id, p_user_id, now_ms)
+            ON CONFLICT (original_match_id, user_id) DO UPDATE SET requested_at = EXCLUDED.requested_at;
+          SELECT COUNT(*) INTO request_count FROM online_match_rematches
+            WHERE original_match_id = p_original_id AND rematch_match_id IS NULL
+              AND requested_at >= now_ms - 60000;
+          IF request_count < 2 THEN RETURN jsonb_build_object('status', 'waiting'); END IF;
+          INSERT INTO online_matches(id, mode, state, player_one, player_two, created_at, updated_at)
+            VALUES (p_new_id, 'friendly', 'waiting', m.player_one, m.player_two, now_ms, now_ms);
+          UPDATE online_match_rematches SET rematch_match_id = p_new_id
+            WHERE original_match_id = p_original_id AND requested_at >= now_ms - 60000;
+          PERFORM arena_start_match(p_new_id);
+          RETURN jsonb_build_object('status', 'matched', 'matchId', p_new_id);
         END
         $function$`;
 
@@ -432,6 +475,41 @@ async function handleRequest(req, res) {
       if (!/^[A-F0-9]{6}$/.test(code)) throw apiError('Escribe un código de invitación válido.');
       const [result] = await sql`SELECT arena_join_invite(${user.id}, ${code}) AS result`;
       payload = result.result;
+    } else if (body.action === 'rematch') {
+      if (typeof body.matchId !== 'string' || !body.matchId) throw apiError('No se encontró la partida anterior.');
+      const [result] = await sql`SELECT arena_request_friendly_rematch(${body.matchId}, ${crypto.randomUUID()}, ${user.id}) AS result`;
+      payload = result.result;
+    } else if (body.action === 'rematch-poll') {
+      if (typeof body.matchId !== 'string' || !body.matchId) throw apiError('No se encontró la partida anterior.');
+      const [original] = await sql`SELECT player_one, player_two, mode FROM online_matches
+        WHERE id = ${body.matchId} AND (player_one = ${user.id} OR player_two = ${user.id})`;
+      if (!original || original.mode !== 'friendly') throw apiError('No se encontró la partida amistosa.');
+      const [request] = await sql`SELECT requested_at, rematch_match_id FROM online_match_rematches
+        WHERE original_match_id = ${body.matchId} AND user_id = ${user.id}`;
+      if (request?.rematch_match_id) {
+        payload = { status: 'matched', matchId: request.rematch_match_id };
+      } else if (request && now - Number(request.requested_at) > REMATCH_TTL_MS) {
+        payload = { status: 'expired' };
+      } else if (request) {
+        payload = { status: 'waiting' };
+      } else {
+        const opponentId = original.player_one === user.id ? original.player_two : original.player_one;
+        const [opponentRequest] = await sql`SELECT requested_at FROM online_match_rematches
+          WHERE original_match_id = ${body.matchId} AND user_id = ${opponentId}
+            AND rematch_match_id IS NULL`;
+        payload = opponentRequest && now - Number(opponentRequest.requested_at) <= REMATCH_TTL_MS
+          ? { status: 'invited' }
+          : { status: 'idle' };
+      }
+    } else if (body.action === 'rematch-cancel') {
+      if (typeof body.matchId !== 'string' || !body.matchId) throw apiError('No se encontró la partida anterior.');
+      const [request] = await sql`SELECT rematch_match_id FROM online_match_rematches
+        WHERE original_match_id = ${body.matchId} AND user_id = ${user.id}`;
+      if (request?.rematch_match_id) payload = { status: 'matched', matchId: request.rematch_match_id };
+      else {
+        await sql`DELETE FROM online_match_rematches WHERE original_match_id = ${body.matchId} AND user_id = ${user.id}`;
+        payload = { status: 'cancelled' };
+      }
     } else if (body.action === 'action') {
       if (typeof body.matchId !== 'string' || !ZONES.includes(body.zone)) throw apiError('La jugada no es válida.');
       const [result] = await sql`SELECT arena_submit_action(${user.id}, ${body.matchId}, ${body.zone}) AS result`;
