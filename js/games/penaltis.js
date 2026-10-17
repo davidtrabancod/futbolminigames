@@ -247,7 +247,7 @@ class PenaltisGame {
     const targetZone = this.TARGET_ZONES.find(z => z.id === shooterZoneId) || this.TARGET_ZONES[2];
     this.onlineVisualTurnRole = turnRole;
     this.onlineVisualIsGoal = isGoal;
-    this.ball.flightTime = 0.6;
+    this.ball.flightTime = 0.54;
     this.launchAnimeShot(targetZone, keeperZoneId);
   }
 
@@ -378,7 +378,7 @@ class PenaltisGame {
       targetX: 200,
       targetY: 200,
       progress: 0,
-      flightTime: 0.6,
+      flightTime: 0.54,
       rotation: 0,
       spin: 0,
       physicsState: null,
