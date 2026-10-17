@@ -59,6 +59,13 @@ class PenaltisGame {
       this.goal3D = null;
     }
 
+    try {
+      this.football3D = new window.Football3DRenderer(this.vWidth, this.vHeight);
+    } catch (error) {
+      console.warn('No se pudo iniciar el modelo 3D del balÃ³n:', error);
+      this.football3D = null;
+    }
+
     this.auraParticles = [];
     this.speedLines = [];
     this.ballFireTrail = [];
@@ -729,19 +736,28 @@ class PenaltisGame {
     if (this.state === 'shooting' && this.ball.inFlight) {
       this.ball.progress += dt / this.ball.flightTime;
       const t = Math.min(1.0, this.ball.progress);
-      const depthProgress = t;
-      const lateralCurve = Math.sin(Math.PI * t) * this.ball.spin * .52;
       const targetArc = this.ball.targetY < 210 ? 18 : this.ball.targetY > 260 ? 34 : 26;
+      const depthCurve = 1.63;
+      const targetPerspective = 1 / (1 + depthCurve);
+      const perspective = 1 / (1 + depthCurve * t);
+      const perspectiveRate = -depthCurve * perspective * perspective;
+
+      // Move in virtual 3D space, then project through the stadium vanishing point.
+      const worldStartX = this.ball.startX - 200;
+      const worldTargetX = (this.ball.targetX - 200) / targetPerspective;
+      const worldX = worldStartX + (worldTargetX - worldStartX) * t;
+      const worldStartY = this.ball.startY - 287;
+      const worldTargetY = (this.ball.targetY - 287) / targetPerspective;
+      const worldArc = targetArc / (1 / (1 + depthCurve * .5));
+      const worldY = worldStartY + (worldTargetY - worldStartY) * t - worldArc * 4 * t * (1 - t);
 
       // Flight arc and depth shrink toward the goal; the shadow stays on the pitch.
-      this.ball.x = this.ball.startX + (this.ball.targetX - this.ball.startX) * depthProgress + lateralCurve;
-      this.ball.y = this.ball.startY + (this.ball.targetY - this.ball.startY) * depthProgress
-        - targetArc * 4 * t * (1 - t);
-      this.ball.scale = 1 - .62 * depthProgress;
-      this.ball.flightVX = ((this.ball.targetX - this.ball.startX)
-        + this.ball.spin * .52 * Math.PI * Math.cos(Math.PI * t)) / this.ball.flightTime;
-      this.ball.flightVY = ((this.ball.targetY - this.ball.startY)
-        - 4 * targetArc * (1 - 2 * t)) / this.ball.flightTime;
+      this.ball.x = 200 + worldX * perspective;
+      this.ball.y = 287 + worldY * perspective;
+      this.ball.scale = perspective;
+      this.ball.flightVX = ((worldTargetX - worldStartX) * perspective + worldX * perspectiveRate) / this.ball.flightTime;
+      this.ball.flightVY = ((worldTargetY - worldStartY - 4 * worldArc * (1 - 2 * t)) * perspective
+        + worldY * perspectiveRate) / this.ball.flightTime;
       this.ball.rotation += dt * this.ball.spin;
 
       const anticipationStart = this.keeper.reactionDelay * 0.58;
@@ -2015,12 +2031,15 @@ class PenaltisGame {
 
     // The shadow stays on the turf while the ball rises toward the goal.
     const flight = b.inFlight || b.inNet ? Math.min(1, b.progress || 1) : 0;
-    const shadowX = b.inFlight || b.inNet ? b.startX + (b.targetX - b.startX) * flight : b.x;
+    const shadowX = b.inFlight ? b.x : b.inNet ? b.targetX : b.x;
     const goalLineY = 310;
+    const shadowPerspective = 1 / (1 + 1.63 * flight);
+    const groundStartY = b.startY - 287;
+    const groundTargetY = (goalLineY - 287) / .38;
     const shadowY = b.inFlight || b.inNet
-      ? b.startY + (goalLineY - b.startY) * flight
+      ? 287 + (groundStartY + (groundTargetY - groundStartY) * flight) * shadowPerspective
       : b.y + b.radius * b.scale * .72;
-    const shadowScale = b.inFlight || b.inNet ? .96 - flight * .46 : .92;
+    const shadowScale = b.inFlight || b.inNet ? .96 * shadowPerspective : .92;
     ctx.globalAlpha = b.inFlight ? .22 - flight * .13 : b.inNet ? .08 : .24;
     ctx.fillStyle = '#02070a';
     ctx.filter = 'blur(5px)';
@@ -2029,6 +2048,18 @@ class PenaltisGame {
     ctx.fill();
     ctx.filter = 'none';
     ctx.globalAlpha = 1;
+
+    if (this.football3D) {
+      try {
+        this.football3D.draw(b);
+        ctx.drawImage(this.football3D.canvas, 0, 0, this.vWidth, this.vHeight);
+        ctx.restore();
+        return;
+      } catch (error) {
+        console.warn('Se perdiÃ³ el contexto 3D del balÃ³n:', error);
+        this.football3D = null;
+      }
+    }
 
     ctx.translate(b.x, b.y);
     ctx.scale(b.scale, b.scale);
