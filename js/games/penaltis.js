@@ -38,11 +38,11 @@ class PenaltisGame {
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 178, icon: '↖️' },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 178, icon: '↗️' },
-      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 236, icon: '🎯' },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 295, icon: '↙️' },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 295, icon: '↘️' }
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 166, icon: '↖️' },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 166, icon: '↗️' },
+      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 230, icon: '🎯' },
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 294, icon: '↙️' },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 294, icon: '↘️' }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -210,9 +210,9 @@ class PenaltisGame {
 
     this.goal = {
       x: 40,
-      y: 163,
+      y: 150,
       w: 320,
-      h: 147,
+      h: 160,
       postWidth: 12
     };
 
@@ -1582,7 +1582,7 @@ class PenaltisGame {
     return {
       // Match the compressed field's vanishing point and goal-line height.
       x: 200 + (x / 7.32 - .5) * 322 * perspective,
-      y: 287 + (310 - (y / 2.44) * 147 - 287) * perspective
+      y: 287 + (310 - (y / 2.44) * 160 - 287) * perspective
     };
   }
 
