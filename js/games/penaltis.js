@@ -38,11 +38,11 @@ class PenaltisGame {
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 189, icon: '↖️' },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 189, icon: '↗️' },
-      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 262, icon: '🎯' },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 322, icon: '↙️' },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 322, icon: '↘️' }
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', x: 94, y: 178, icon: '↖️' },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', x: 306, y: 178, icon: '↗️' },
+      { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', x: 200, y: 236, icon: '🎯' },
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', x: 94, y: 295, icon: '↙️' },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', x: 306, y: 295, icon: '↘️' }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -75,6 +75,12 @@ class PenaltisGame {
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
     this.arenaBackground.src = './assets/penalty-stadium-perspective.png';
+    this.stadiumAdItems = [];
+    this.setStadiumAds([
+      { text: 'PENALTY RUSH', color: '#facc15' },
+      { text: 'TU PATROCINIO AQU\u00cd', color: '#67e8f9' },
+      { text: 'TU IMAGEN O MARCA', color: '#86efac' }
+    ]);
     this.fireSprite = new Image();
     this.fireSprite.src = './assets/brazier-flame-sprite.png';
     this.crowdLights = Array.from({ length: 115 }, (_, index) => ({
@@ -86,6 +92,27 @@ class PenaltisGame {
       color: ['#ffe28a', '#6be7ff', '#ff805c', '#ffffff'][index % 4]
     }));
     this.fireEmbers = [];
+  }
+
+  // Pass strings or { text, color } / { src, alt, color } entries to create
+  // a moving LED sponsor ribbon. Image files should be served by this site.
+  setStadiumAds(items = []) {
+    this.stadiumAdItems = (Array.isArray(items) ? items : []).map((entry, index) => {
+      const ad = typeof entry === 'string' ? { text: entry } : (entry || {});
+      const item = {
+        text: String(ad.text || ''),
+        alt: String(ad.alt || ad.text || `Patrocinador ${index + 1}`),
+        color: ad.color || ['#facc15', '#67e8f9', '#86efac'][index % 3],
+        image: ad.image || null,
+        width: 0
+      };
+      if (!item.image && ad.src) {
+        item.image = new Image();
+        item.image.src = ad.src;
+      }
+      item.width = item.image ? 150 : Math.max(125, Math.min(270, item.text.length * 9 + 36));
+      return item;
+    });
   }
 
   // --- MÉTODOS ONLINE ---
@@ -185,18 +212,18 @@ class PenaltisGame {
       x: 40,
       y: 163,
       w: 320,
-      h: 191,
+      h: 147,
       postWidth: 12
     };
 
     const lvl = this.currentLevel;
     this.keeper = {
       x: 200,
-      y: 314,
+      y: 270,
       baseX: 200,
-      baseY: 314,
+      baseY: 270,
       targetX: 200,
-      targetY: 314,
+      targetY: 270,
       rotation: 0,
       diving: false,
       state: 'idle',
@@ -207,7 +234,7 @@ class PenaltisGame {
       recovering: false,
       diveDirection: 0,
       diveStartX: 200,
-      diveStartY: 314,
+      diveStartY: 270,
       anticipating: false,
       diveSpeed: lvl.diveSpeed,
       reactionDelay: lvl.reactionDelay,
@@ -1091,7 +1118,18 @@ class PenaltisGame {
       ctx.fillStyle = fallback;
       ctx.fillRect(0, 0, this.app.virtualWidth, this.app.virtualHeight);
     } else {
-      ctx.drawImage(image, 0, 0, this.app.virtualWidth, this.app.virtualHeight);
+      const sourceStandLine = image.naturalHeight * .4676;
+      const sourceGoalLine = image.naturalHeight * .5920;
+      const outputStandLine = this.app.virtualHeight * .4676;
+      const outputGoalLine = this.app.virtualHeight * .5167;
+      // Compress only the far strip between the stands and the goal line.
+      // The foreground turf keeps its perspective and texture scale.
+      ctx.drawImage(image, 0, 0, image.naturalWidth, sourceStandLine,
+        0, 0, this.app.virtualWidth, outputStandLine);
+      ctx.drawImage(image, 0, sourceStandLine, image.naturalWidth, sourceGoalLine - sourceStandLine,
+        0, outputStandLine, this.app.virtualWidth, outputGoalLine - outputStandLine);
+      ctx.drawImage(image, 0, sourceGoalLine, image.naturalWidth, image.naturalHeight - sourceGoalLine,
+        0, outputGoalLine, this.app.virtualWidth, this.app.virtualHeight - outputGoalLine);
     }
 
     const width = this.app.virtualWidth;
@@ -1152,6 +1190,76 @@ class PenaltisGame {
     vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(1,7,14,.48)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, width, height);
+    this.renderStadiumAds(ctx);
+  }
+
+  renderStadiumAds(ctx) {
+    const ads = this.stadiumAdItems;
+    if (!ads?.length) return;
+
+    const width = this.app.virtualWidth;
+    const height = 22;
+    const y = this.app.virtualHeight * .442;
+    const pad = 4;
+    const separator = 42;
+    const cycleWidth = ads.reduce((sum, ad) => sum + ad.width + separator, 0);
+    const offset = (this.timer * 58) % cycleWidth;
+
+    ctx.save();
+    ctx.shadowColor = '#22d3ee';
+    ctx.shadowBlur = 11;
+    const shell = ctx.createLinearGradient(0, y, 0, y + height);
+    shell.addColorStop(0, '#172833');
+    shell.addColorStop(.45, '#07151d');
+    shell.addColorStop(1, '#101c23');
+    ctx.fillStyle = shell;
+    ctx.fillRect(0, y, width, height);
+    ctx.shadowBlur = 0;
+
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(103,232,249,.92)';
+    ctx.strokeRect(.7, y + .7, width - 1.4, height - 1.4);
+    ctx.fillStyle = 'rgba(250,204,21,.9)';
+    ctx.fillRect(0, y, width, 1.5);
+    ctx.fillRect(0, y + height - 1.5, width, 1.5);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(pad, y + 2, width - pad * 2, height - 4);
+    ctx.clip();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 10px "Chakra Petch", "Arial Narrow", sans-serif';
+    const firstCycleX = -offset;
+    const cycles = Math.ceil(width / cycleWidth) + 1;
+    for (let cycle = -1; cycle < cycles; cycle++) {
+      let x = firstCycleX + cycle * cycleWidth;
+      for (const ad of ads) {
+        const centerX = x + ad.width / 2;
+        const image = ad.image;
+        if (image?.complete && image.naturalWidth) {
+          const scale = Math.min((ad.width - 18) / image.naturalWidth, 14 / image.naturalHeight);
+          const drawW = image.naturalWidth * scale;
+          const drawH = image.naturalHeight * scale;
+          ctx.drawImage(image, centerX - drawW / 2, y + (height - drawH) / 2, drawW, drawH);
+        } else {
+          ctx.fillStyle = ad.color;
+          ctx.shadowColor = ad.color;
+          ctx.shadowBlur = 5;
+          ctx.fillText(ad.text || ad.alt, centerX, y + height / 2 + .5, ad.width - 12);
+          ctx.shadowBlur = 0;
+        }
+        x += ad.width;
+        ctx.fillStyle = 'rgba(255,255,255,.9)';
+        ctx.shadowColor = '#67e8f9';
+        ctx.shadowBlur = 5;
+        ctx.fillText('✦', x + separator / 2, y + height / 2);
+        ctx.shadowBlur = 0;
+        x += separator;
+      }
+    }
+    ctx.restore();
+    ctx.restore();
   }
 
   renderPenaltyPitchDetails(ctx) {
@@ -1472,9 +1580,9 @@ class PenaltisGame {
     const d = Math.max(0, Math.min(2.2, depth));
     const perspective = 1 / (1 + d / 26.6);
     return {
-      // Same field vanishing point and goal-line calibration as Goal3DRenderer.
+      // Match the compressed field's vanishing point and goal-line height.
       x: 200 + (x / 7.32 - .5) * 322 * perspective,
-      y: 297 + (354.5 - (y / 2.44) * 191 - 297) * perspective
+      y: 287 + (310 - (y / 2.44) * 147 - 287) * perspective
     };
   }
 

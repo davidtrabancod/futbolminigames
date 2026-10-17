@@ -34,15 +34,15 @@ class Goal3DRenderer {
       varying vec4 vColor;
       varying vec3 vPosition;
       void main() {
-        // Calibrated to the stadium plate: turf stripes converge at the
-        // canvas centre near y=297, and the painted goal line sits at y=355.
+        // Calibrated to the compressed stadium plate: turf converges near
+        // y=287 and the goal line sits at y=310.
         // Project both horizontal and vertical coordinates toward that same
         // vanishing point so the rear net follows the grass perspective.
         float depth = max(-aPosition.z, 0.0);
         float perspective = 1.0 / (1.0 + depth / 26.6);
         float px = 200.0 + aPosition.x * 43.8 * perspective;
-        float frontY = 354.5 - aPosition.y * 78.3;
-        float py = 297.0 + (frontY - 297.0) * perspective;
+        float frontY = 310.0 - aPosition.y * 60.25;
+        float py = 287.0 + (frontY - 287.0) * perspective;
         gl_Position = vec4(px / 200.0 - 1.0, 1.0 - py / 300.0,
                            0.45 - aPosition.z * 0.025, 1.0);
         vNormal = aNormal;
