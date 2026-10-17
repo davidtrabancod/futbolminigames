@@ -185,14 +185,9 @@ class Goal3DRenderer {
     };
     const position = node => {
       const flex = node.depth - (node.origDepth ?? 1.8);
-      // A head-on view compresses depth changes. Convert the node's measured
-      // recoil into a restrained radial spread that reads as a stretched pocket.
-      const stretch = impactPoint
-        ? Math.max(.72, Math.min(1.8, 1 + flex * 5))
-        : 1;
-      const x = impactPoint ? impactPoint.x + (node.x - impactPoint.x) * stretch : node.x;
-      const y = impactPoint ? impactPoint.y + (node.y - impactPoint.y) * stretch : node.y;
-      return [x - 3.66, y, -Math.max(0, node.depth + flex * .35)];
+      // Render the solved mesh directly. Radially scaling it around the hit
+      // point made the side columns spill past the posts during a hard shot.
+      return [node.x - 3.66, node.y, -Math.max(0, node.depth + flex * .35)];
     };
     if (nodes?.length) {
       for (let r = 0; r < nodes.length; r++) for (let c = 0; c < nodes[r].length; c++) {

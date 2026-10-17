@@ -1067,7 +1067,11 @@ class PenaltisGame {
         const node = this.netNodes[r][c];
         node.prevX = node.x; node.prevY = node.y; node.prevDepth = node.depth;
         if (!node.invMass) continue;
-        node.vy -= .35 * fixedStep;
+        // A light restoring force lets the mesh settle back to its authored
+        // sag instead of retaining tiny residual offsets after a goal.
+        node.vx += (node.origX - node.x) * 4.5 * fixedStep;
+        node.vy += (node.origY - node.y) * 4.5 * fixedStep;
+        node.vz += (node.origDepth - node.depth) * 4.5 * fixedStep;
         node.x += node.vx * fixedStep;
         node.y += node.vy * fixedStep;
         node.depth += node.vz * fixedStep;
@@ -1096,7 +1100,8 @@ class PenaltisGame {
         }
       }
 
-      const damping = Math.exp(-1.4 * fixedStep);
+      const damping = Math.exp(-3.2 * fixedStep);
+      let settled = true;
       for (let r = 0; r <= this.netRows; r++) for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
         if (!node.invMass) {
@@ -1104,10 +1109,22 @@ class PenaltisGame {
           node.vx = node.vy = node.vz = 0;
           continue;
         }
+        // Keep edge cords inside the frame footprint; the hit response comes
+        // from the net's depth and local bow, not from escaping sideways.
+        node.x = Math.max(.16, Math.min(7.16, node.x));
         node.vx = (node.x - node.prevX) / fixedStep * damping;
         node.vy = (node.y - node.prevY) / fixedStep * damping;
         node.vz = (node.depth - node.prevDepth) / fixedStep * damping;
+        const offset = Math.hypot(node.x - node.origX, node.y - node.origY, node.depth - node.origDepth);
+        const speed = Math.hypot(node.vx, node.vy, node.vz);
+        if (offset < .004 && speed < .025) {
+          node.x = node.origX; node.y = node.origY; node.depth = node.origDepth;
+          node.vx = node.vy = node.vz = 0;
+        } else {
+          settled = false;
+        }
       }
+      if (settled) this.netImpactPoint = null;
       this.netPhysicsAccumulator -= fixedStep;
       steps++;
     }
@@ -1967,11 +1984,7 @@ class PenaltisGame {
 
   projectNetNode(node) {
     const flex = node.depth - node.origDepth;
-    const impact = this.netImpactPoint;
-    const stretch = impact ? Math.max(.72, Math.min(1.8, 1 + flex * 5)) : 1;
-    const x = impact ? impact.x + (node.x - impact.x) * stretch : node.x;
-    const y = impact ? impact.y + (node.y - impact.y) * stretch : node.y;
-    return this.projectGoal3D(x, y, Math.max(0, node.depth + flex * .35));
+    return this.projectGoal3D(node.x, node.y, Math.max(0, node.depth + flex * .35));
   }
 
   drawGoalTube(ctx, a, b) {
