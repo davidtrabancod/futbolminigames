@@ -608,7 +608,9 @@ class OnlineArena {
     const button = this.refs.onlinePlayAgainBtn;
     const label = button?.querySelector('span');
     if (button) button.disabled = waiting;
-    if (label) label.textContent = waiting ? 'ESPERANDO A TU AMIGO…' : 'JUGAR OTRA VEZ';
+    if (label) label.textContent = waiting
+      ? 'ESPERANDO A TU AMIGO…'
+      : this.currentMode === 'friendly' ? 'REVANCHA' : 'JUGAR OTRA VEZ';
     if (this.refs.onlineResultSummary && waiting) {
       this.refs.onlineResultSummary.textContent = 'Revancha solicitada. Tu amigo entrará al partido cuando pulse «Jugar otra vez».';
     }
@@ -1148,6 +1150,7 @@ class OnlineArena {
       this.pendingOnlineResultTimer = null;
     }
     this.lastFinishedMatchId = message.matchId || this.matchId;
+    if (message.mode) this.currentMode = message.mode;
     this.rematchPending = false;
     this.rematchWatching = false;
     this.stopFriendlyRematchPolling();
@@ -1199,16 +1202,22 @@ class OnlineArena {
     this.refs.onlineResultOpponentScore.textContent = opponentScore;
 
     this.refs.onlineRatingChange.classList.remove('is-up', 'is-down');
+    const ratingMain = this.refs.onlineRatingChange.querySelector('.online-rating-change__main');
+    const ratingSub = this.refs.onlineRatingChange.querySelector('.online-rating-change__sub');
     if (!ranked) {
-      this.refs.onlineRatingChange.textContent = normal ? 'PARTIDA NORMAL · SIN CAMBIO DE PUNTOS' : 'AMISTOSA · SIN CAMBIO DE PUNTOS';
+      ratingMain.textContent = normal ? 'PARTIDA NORMAL' : 'PARTIDA AMISTOSA';
+      ratingSub.textContent = 'SIN CAMBIO DE PUNTOS';
     } else if (delta > 0) {
-      this.refs.onlineRatingChange.textContent = `+${delta} PTS · TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
+      ratingMain.textContent = `+${delta} PTS`;
+      ratingSub.textContent = `TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
       this.refs.onlineRatingChange.classList.add('is-up');
     } else if (delta < 0) {
-      this.refs.onlineRatingChange.textContent = `${delta} PTS · TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
+      ratingMain.textContent = `${delta} PTS`;
+      ratingSub.textContent = `TOTAL ${updatedUser?.rating ?? rating.after ?? '—'}`;
       this.refs.onlineRatingChange.classList.add('is-down');
     } else {
-      this.refs.onlineRatingChange.textContent = `SIN CAMBIO · ${updatedUser?.rating ?? rating.after ?? '—'} PTS`;
+      ratingMain.textContent = 'SIN CAMBIO';
+      ratingSub.textContent = `${updatedUser?.rating ?? rating.after ?? '—'} PTS`;
     }
 
     const record = updatedUser ? `${updatedUser.wins ?? 0} victorias · ${updatedUser.losses ?? 0} derrotas` : '';
