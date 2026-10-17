@@ -97,7 +97,7 @@ class PenaltisGame {
 
   initArenaAtmosphere() {
     this.arenaBackground = new Image();
-    this.arenaBackground.src = './assets/penalty-stadium-perspective.png';
+    this.arenaBackground.src = './assets/penalty-stadium-perspective.webp';
     this.stadiumAdItems = [];
     this.setStadiumAds([
       { text: 'PENALTY RUSH', color: '#facc15' },

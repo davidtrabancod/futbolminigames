@@ -84,6 +84,15 @@ body {
   -webkit-user-select: text !important;
 }
 
+.seo-readable__faq {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(90, 219, 191, .26);
+  border-radius: 1rem;
+  background: rgba(5, 23, 30, .72);
+}
+.seo-readable__faq h3 { margin-top: 1.2rem; color: #e6fff5; font-size: 1rem; font-weight: 800; }
+.seo-readable__faq p { margin-top: .3rem; color: #bfddd4; font-size: .9rem; line-height: 1.65; }
+
 /* Fondo Estadio con franjas de césped */
 .stadium-bg {
   background: 
@@ -1021,7 +1030,7 @@ body {
     text-align: center;
   }
 
-  .online-hub__duel-heading h3 {
+  .online-hub__duel-heading h1 {
     margin-top: 0.25rem;
     color: #fff7cf;
     font-size: 1.15rem;
@@ -2447,7 +2456,7 @@ body > header .rounded-full[title="Estrellas conseguidas"] {
   filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.45)) drop-shadow(0 9px 12px rgba(0, 0, 0, 0.55));
 }
 
-.online-hub__duel-heading h3 {
+.online-hub__duel-heading h1 {
   color: #f3f8f5;
   font-family: var(--font-display);
   font-size: 1.7rem;
@@ -2844,7 +2853,7 @@ body > footer {
   animation:playPanelCharge 3.2s ease-in-out infinite;
 }
 .online-hub__play .online-hub__duel-heading { margin:.8rem 0 1rem; }
-.online-hub__play .online-hub__duel-heading h3 {
+.online-hub__play .online-hub__duel-heading h1 {
   color:#fff0ae; font-size:clamp(1.65rem,3vw,2.25rem); text-shadow:0 3px 0 #795514,0 0 22px rgba(255,215,80,.34);
 }
 .online-hub__play .online-hub__duel-heading p { color:#d1f8e7; font-size:.96rem; }
@@ -3481,7 +3490,7 @@ body > footer {
 @media (prefers-reduced-motion: reduce) {
   .online-hub__stadium-portrait { animation: none; }
 }
-.online-hub__play .online-hub__duel-heading h3 { letter-spacing:.045em; }
+.online-hub__play .online-hub__duel-heading h1 { letter-spacing:.045em; }
 .guest-prompt { border-radius:.35rem; border-color:rgba(89,244,208,.24); background:linear-gradient(100deg,rgba(3,14,22,.94),rgba(7,36,39,.8)); }
 @media (max-width:640px) {
   .menu-heading { margin:.45rem 0 .85rem; padding:.9rem .65rem 1rem; border-radius:.4rem; }
@@ -3516,7 +3525,7 @@ body > footer {
   font:800 .52rem var(--font-kids); letter-spacing:.25em; line-height:1;
 }
 .online-hub__heading h2,
-.online-hub__play .online-hub__duel-heading h3 {
+.online-hub__play .online-hub__duel-heading h1 {
   font-family:'Bungee',var(--font-display); font-weight:400; letter-spacing:.015em;
   line-height:1.12; text-shadow:0 3px 0 #754914,0 0 22px rgba(255,206,61,.35);
 }
@@ -3677,7 +3686,7 @@ body > footer {
   border:1px solid rgba(255,205,110,.82)!important;
   border-radius:.78rem!important;
   background:#020812!important;
-  background-image:linear-gradient(180deg,rgba(2,8,18,.08),rgba(2,8,18,.22)),url('../assets/penalty-stadium-perspective.png')!important;
+  background-image:linear-gradient(180deg,rgba(2,8,18,.08),rgba(2,8,18,.22)),url('../assets/penalty-stadium-perspective.webp')!important;
   background-position:center;
   background-size:cover;
   box-shadow:0 0 0 2px rgba(10,239,186,.18),0 0 0 5px rgba(0,0,0,.56),0 0 30px rgba(255,104,39,.22),0 20px 52px rgba(0,0,0,.52)!important;

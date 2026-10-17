@@ -2,7 +2,7 @@
   "name": "Penalty Rush - Penaltis Online",
   "short_name": "Penalty Rush",
   "description": "Duelos de penaltis online 1 contra 1. Juega con rivales o invita a tus amigos.",
-  "start_url": "./index.html",
+  "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#15803d",

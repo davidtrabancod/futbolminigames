@@ -14,7 +14,7 @@ const ACTION_TIMEOUT_MS = 45_000;
 const INVITE_TTL_MS = 30 * 60 * 1000;
 const REMATCH_TTL_MS = 60_000;
 const MAX_BODY_BYTES = 16 * 1024;
-const STATIC_EXTENSIONS = new Set(['.html', '.css', '.js', '.svg', '.webmanifest', '.json', '.png', '.jpg', '.jpeg', '.ico', '.txt', '.xml']);
+const STATIC_EXTENSIONS = new Set(['.html', '.css', '.js', '.svg', '.webmanifest', '.json', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.txt', '.xml']);
 const database = new ArenaDatabase(DB_PATH);
 
 const queue = [];
@@ -147,6 +147,7 @@ function mimeType(filePath) {
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
     '.ico': 'image/x-icon',
     '.txt': 'text/plain; charset=utf-8',
     '.xml': 'application/xml; charset=utf-8'
@@ -621,6 +622,11 @@ async function handleApi(req, res, url) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (url.pathname === '/index.html') {
+      res.writeHead(308, { Location: `/${url.search}`, 'Cache-Control': 'public, max-age=3600' });
+      res.end();
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
       return;

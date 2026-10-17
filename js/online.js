@@ -312,6 +312,7 @@ class OnlineArena {
     const keeper = library.byId(keeperId);
     portrait.style.setProperty('--keeper-accent', keeper.colors[0]);
     portrait.src = `./assets/keeper-portrait-${keeper.id}.webp`;
+    portrait.alt = `${keeper.name}, portero del juego de penaltis Penalty Rush`;
   }
 
   renderGoalkeeperRoster() {

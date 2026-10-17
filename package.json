@@ -5,6 +5,7 @@
   "description": "Penalty Rush with persistent accounts and realtime online penalty matches",
   "scripts": {
     "start": "node server.js",
+    "build:css": "tailwindcss -i ./css/tailwind.input.css -o ./css/tailwind.generated.css --minify",
     "test": "node --test"
   },
   "engines": {
@@ -13,5 +14,8 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
   }
 }
