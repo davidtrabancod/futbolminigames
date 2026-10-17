@@ -165,21 +165,38 @@ class Goal3DRenderer {
   buildNet(nodes) {
     // Braided nylon is intentionally brighter and more opaque than the old
     // pale overlay so the rear wall reads as a real net against the stadium.
-    const out = [], color = [0.78, 0.85, 0.80, 0.58];
-    const line = (a, b) => {
+    const out = [], baseColor = [0.78, 0.85, 0.80, 0.58];
+    const line = (a, b, flex = 0) => {
       const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
       const length = Math.hypot(dx, dy, dz) || 1;
       const normal = [0, 0, 1];
+      const highlight = Math.min(.34, Math.abs(flex) * 1.2);
+      const color = [
+        Math.min(1, baseColor[0] + highlight),
+        Math.min(1, baseColor[1] + highlight),
+        Math.min(1, baseColor[2] + highlight),
+        Math.min(.94, baseColor[3] + highlight * .75)
+      ];
       this.vertex(out, a, normal, color); this.vertex(out, b, normal, color);
     };
     if (nodes?.length) {
       for (let r = 0; r < nodes.length; r++) for (let c = 0; c < nodes[r].length; c++) {
-        const n = nodes[r][c], p = [n.x - 3.66, n.y, -n.depth];
+        const n = nodes[r][c];
+        // The stadium plate is a compressed camera view. Amplify only the
+        // net's live displacement so a real, sub-metre cloth pocket remains
+        // legible at this viewing distance; the undeformed goal dimensions
+        // and perspective stay untouched.
+        const flex = n.depth - (n.origDepth ?? 1.8);
+        const p = [n.x - 3.66, n.y, -Math.max(0, n.depth + flex * 7)];
         if (c < nodes[r].length - 1) {
-          const next = nodes[r][c + 1]; line(p, [next.x - 3.66, next.y, -next.depth]);
+          const next = nodes[r][c + 1];
+          const nextFlex = next.depth - (next.origDepth ?? 1.8);
+          line(p, [next.x - 3.66, next.y, -Math.max(0, next.depth + nextFlex * 7)], Math.max(Math.abs(flex), Math.abs(nextFlex)));
         }
         if (r < nodes.length - 1) {
-          const next = nodes[r + 1][c]; line(p, [next.x - 3.66, next.y, -next.depth]);
+          const next = nodes[r + 1][c];
+          const nextFlex = next.depth - (next.origDepth ?? 1.8);
+          line(p, [next.x - 3.66, next.y, -Math.max(0, next.depth + nextFlex * 7)], Math.max(Math.abs(flex), Math.abs(nextFlex)));
         }
       }
     }

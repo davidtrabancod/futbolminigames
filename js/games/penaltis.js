@@ -153,6 +153,16 @@ class PenaltisGame {
     this.ball.inNet = false;
     this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.isDeflected = false;
+    this.ball.physicsState = null;
+    this.ball.physicsAccumulator = 0;
+    this.ball.netAccumulator = 0;
+    this.ball.deflectAccumulator = 0;
+    this.ball.scale = 1;
+    this.ball.progress = 0;
+    this.ball.rotation = 0;
+    this.ball.netAge = 0;
+    this.ball.result = null;
+    this.ball.selectedZone = null;
     this.keeper.catchContactTimer = 0;
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
@@ -174,7 +184,7 @@ class PenaltisGame {
     const targetZone = this.TARGET_ZONES.find(z => z.id === shooterZoneId) || this.TARGET_ZONES[2];
     this.onlineVisualTurnRole = turnRole;
     this.onlineVisualIsGoal = isGoal;
-    this.ball.flightTime = 0.68;
+    this.ball.flightTime = 0.52;
     this.launchAnimeShot(targetZone, keeperZoneId);
   }
   // ----------------------
@@ -183,6 +193,8 @@ class PenaltisGame {
     this.netCols = 32;
     this.netRows = 16;
     this.netNodes = [];
+    this.netConstraints = [];
+    this.netPhysicsAccumulator = 0;
 
     // The animated back panel is anchored to the rear frame of the goal.
     // Keeping its rest depth here makes the ball deform real netting instead
@@ -205,11 +217,32 @@ class PenaltisGame {
           origDepth: netRestDepth,
           vx: 0,
           vy: 0,
-          vz: 0
+          vz: 0,
+          invMass: (r === 0 || r === this.netRows || c === 0 || c === this.netCols) ? 0 : 1,
+          prevX: x,
+          prevY: y,
+          prevDepth: netRestDepth
         };
       }
     }
-    this.netSnapshot = new Float32Array((this.netRows + 1) * (this.netCols + 1) * 3);
+
+    // Structural, shear and bending distance constraints keep the woven
+    // panel taut while allowing a local impact pocket to travel through it.
+    const addConstraint = (r1, c1, r2, c2, stiffness) => {
+      const a = this.netNodes[r1][c1], b = this.netNodes[r2][c2];
+      this.netConstraints.push({ a, b,
+        rest: Math.hypot(a.origX - b.origX, a.origY - b.origY, a.origDepth - b.origDepth),
+        stiffness
+      });
+    };
+    for (let r = 0; r <= this.netRows; r++) for (let c = 0; c <= this.netCols; c++) {
+      if (c < this.netCols) addConstraint(r, c, r, c + 1, .82);
+      if (r < this.netRows) addConstraint(r, c, r + 1, c, .82);
+      if (r < this.netRows && c < this.netCols) addConstraint(r, c, r + 1, c + 1, .14);
+      if (r < this.netRows && c > 0) addConstraint(r, c, r + 1, c - 1, .14);
+      if (c + 2 <= this.netCols) addConstraint(r, c, r, c + 2, .025);
+      if (r + 2 <= this.netRows) addConstraint(r, c, r + 2, c, .025);
+    }
   }
 
   reset() {
@@ -260,14 +293,18 @@ class PenaltisGame {
       startY: 510,
       x: 200,
       y: 510,
-      radius: 25,
+      radius: 29,
       scale: 1.0,
       targetX: 200,
       targetY: 200,
       progress: 0,
-      flightTime: 0.68,
+      flightTime: 0.52,
       rotation: 0,
       spin: 0,
+      physicsState: null,
+      physicsAccumulator: 0,
+      netAccumulator: 0,
+      deflectAccumulator: 0,
       flightVX: 0,
       flightVY: 0,
       isDeflected: false,
@@ -599,7 +636,9 @@ class PenaltisGame {
     this.ball.result = null;
     this.ball.flightVX = 0;
     this.ball.flightVY = 0;
-    this.ball.spin = (Math.random() < .5 ? -1 : 1) * (8 + Math.random() * 7);
+    this.ball.spin = (Math.random() < .5 ? -1 : 1) * (20 + Math.random() * 16);
+    this.ball.physicsAccumulator = 0;
+    this.ball.physicsState = this.createBallFlightPhysics(zone);
 
     if (window.soundManager.playAnimeShot) {
       window.soundManager.playAnimeShot();
@@ -611,6 +650,9 @@ class PenaltisGame {
     this.camera.targetZoom = 1.0;
     this.camera.shake = 0;
     this.ball.isDeflected = false;
+    this.ball.physicsAccumulator = 0;
+    this.ball.netAccumulator = 0;
+    this.ball.deflectAccumulator = 0;
     this.keeper.catchContactTimer = 0;
 
     const lvl = this.currentLevel;
@@ -640,6 +682,135 @@ class PenaltisGame {
     this.keeper.anticipating = false;
     this.keeper.recovering = false;
     this.keeper.rotation = 0;
+  }
+
+  projectBallPhysics(state) {
+    const depth = this.ball.physicsTargetDepth || 0;
+    const depthRatio = depth > 0 ? Math.max(0, Math.min(1, state.z / depth)) : 0;
+    const perspective = 1 / (1 + Math.max(0, state.z) / 26.6);
+    const groundY = 517.2 + (317.2 - 517.2) * depthRatio;
+    return {
+      x: 200 + state.x * 43.8 * perspective,
+      y: groundY - state.y * 65.6,
+      scale: perspective
+    };
+  }
+
+  integrateBallPhysics(state, step, spin) {
+    const speed = Math.hypot(state.vx, state.vy, state.vz);
+    const drag = .0095 * speed;
+    const spinAtTime = spin * Math.exp(-.2 * state.time);
+    // A vertical spin axis creates the familiar sideways Magnus curl.
+    const magnus = .0037 * spinAtTime * .11 * speed;
+    const ax = -drag * state.vx + magnus * (state.vz / Math.max(speed, .001));
+    const ay = -9.81 - drag * state.vy;
+    const az = -drag * state.vz - magnus * (state.vx / Math.max(speed, .001));
+    state.vx += ax * step;
+    state.vy += ay * step;
+    state.vz += az * step;
+    state.x += state.vx * step;
+    state.y += state.vy * step;
+    state.z += state.vz * step;
+    state.time += step;
+  }
+
+  simulateBallEndpoint(initialVelocity, duration, spin) {
+    const state = { x: 0, y: .11, z: 0,
+      vx: initialVelocity[0], vy: initialVelocity[1], vz: initialVelocity[2], time: 0 };
+    const fixedStep = 1 / 120;
+    while (state.time < duration - 1e-8) {
+      this.integrateBallPhysics(state, Math.min(fixedStep, duration - state.time), spin);
+    }
+    return [state.x, state.y, state.z];
+  }
+
+  solveThreeByThree(matrix, vector) {
+    const rows = matrix.map((row, i) => [...row, vector[i]]);
+    for (let col = 0; col < 3; col++) {
+      let pivot = col;
+      for (let row = col + 1; row < 3; row++) {
+        if (Math.abs(rows[row][col]) > Math.abs(rows[pivot][col])) pivot = row;
+      }
+      if (Math.abs(rows[pivot][col]) < 1e-8) return null;
+      [rows[col], rows[pivot]] = [rows[pivot], rows[col]];
+      const divisor = rows[col][col];
+      for (let j = col; j < 4; j++) rows[col][j] /= divisor;
+      for (let row = 0; row < 3; row++) if (row !== col) {
+        const factor = rows[row][col];
+        for (let j = col; j < 4; j++) rows[row][j] -= factor * rows[col][j];
+      }
+    }
+    return rows.map(row => row[3]);
+  }
+
+  createBallFlightPhysics(zone) {
+    const duration = this.ball.flightTime;
+    const targetPerspective = .71;
+    const targetDepth = 26.6 * (1 / targetPerspective - 1);
+    this.ball.physicsTargetDepth = targetDepth;
+    const target = [
+      (zone.x - 200) / (43.8 * targetPerspective),
+      (317.2 - zone.y) / 65.6,
+      targetDepth
+    ];
+    const spin = this.ball.spin;
+    let velocity = [
+      target[0] / duration,
+      (target[1] - .11 + 4.905 * duration * duration) / duration,
+      target[2] / duration
+    ];
+
+    // Shooting method: solve the launch velocity against the same drag and
+    // Magnus integration used in play, so every tactical target is reached
+    // without bending the rendered path onto an unrelated scripted point.
+    for (let iteration = 0; iteration < 7; iteration++) {
+      const endpoint = this.simulateBallEndpoint(velocity, duration, spin);
+      const error = target.map((value, axis) => value - endpoint[axis]);
+      if (Math.hypot(...error) < .0005) break;
+      const jacobian = [[], [], []];
+      for (let axis = 0; axis < 3; axis++) {
+        const trial = velocity.slice();
+        trial[axis] += .02;
+        const displaced = this.simulateBallEndpoint(trial, duration, spin);
+        for (let row = 0; row < 3; row++) jacobian[row][axis] = (displaced[row] - endpoint[row]) / .02;
+      }
+      const correction = this.solveThreeByThree(jacobian, error);
+      if (!correction) break;
+      for (let axis = 0; axis < 3; axis++) velocity[axis] += correction[axis];
+    }
+    return { x: 0, y: .11, z: 0,
+      vx: velocity[0], vy: velocity[1], vz: velocity[2], time: 0 };
+  }
+
+  advanceBallFlight(dt) {
+    const ball = this.ball, state = ball.physicsState;
+    if (!state) return;
+    const previous = this.projectBallPhysics(state);
+    const fixedStep = 1 / 120;
+    ball.physicsAccumulator = Math.min(.1, (ball.physicsAccumulator || 0) + dt);
+    let simulated = 0;
+    const startTime = state.time;
+    while (ball.physicsAccumulator >= fixedStep - 1e-8 && state.time < ball.flightTime) {
+      const step = Math.min(fixedStep, ball.flightTime - state.time);
+      this.integrateBallPhysics(state, step, ball.spin);
+      ball.physicsAccumulator -= step;
+      simulated += step;
+      const projected = this.projectBallPhysics(state);
+      ball.x = projected.x;
+      ball.y = projected.y;
+      ball.scale = projected.scale;
+      ball.flightVX = (projected.x - previous.x) / Math.max(simulated, step);
+      ball.flightVY = (projected.y - previous.y) / Math.max(simulated, step);
+    }
+    ball.progress = Math.min(1, state.time / ball.flightTime);
+    ball.rotation += ball.spin * (Math.exp(-.2 * startTime) - Math.exp(-.2 * state.time)) / .2;
+
+    if (state.time >= ball.flightTime - 1e-7) {
+      ball.progress = 1;
+      ball.x = ball.targetX;
+      ball.y = ball.targetY;
+      ball.scale = 1 / (1 + (this.ball.physicsTargetDepth / 26.6));
+    }
   }
 
   spawnMangaSpeedLines() {
@@ -740,31 +911,8 @@ class PenaltisGame {
     }
 
     if (this.state === 'shooting' && this.ball.inFlight) {
-      this.ball.progress += dt / this.ball.flightTime;
-      const t = Math.min(1.0, this.ball.progress);
-      const targetArc = this.ball.targetY < 210 ? 18 : this.ball.targetY > 260 ? 34 : 26;
-      const targetPerspective = 0.56;
-      const depthCurve = (1 / targetPerspective) - 1;
-      const perspective = 1 / (1 + depthCurve * t);
-      const perspectiveRate = -depthCurve * perspective * perspective;
-
-      // Move in virtual 3D space, then project through the stadium vanishing point.
-      const worldStartX = this.ball.startX - 200;
-      const worldTargetX = (this.ball.targetX - 200) / targetPerspective;
-      const worldX = worldStartX + (worldTargetX - worldStartX) * t;
-      const worldStartY = this.ball.startY - 287;
-      const worldTargetY = (this.ball.targetY - 287) / targetPerspective;
-      const worldArc = targetArc / (1 / (1 + depthCurve * .5));
-      const worldY = worldStartY + (worldTargetY - worldStartY) * t - worldArc * 4 * t * (1 - t);
-
-      // Flight arc and depth shrink toward the goal; the shadow stays on the pitch.
-      this.ball.x = 200 + worldX * perspective;
-      this.ball.y = 287 + worldY * perspective;
-      this.ball.scale = perspective;
-      this.ball.flightVX = ((worldTargetX - worldStartX) * perspective + worldX * perspectiveRate) / this.ball.flightTime;
-      this.ball.flightVY = ((worldTargetY - worldStartY - 4 * worldArc * (1 - 2 * t)) * perspective
-        + worldY * perspectiveRate) / this.ball.flightTime;
-      this.ball.rotation += dt * this.ball.spin;
+      this.advanceBallFlight(dt);
+      const t = this.ball.progress;
 
       const anticipationStart = this.keeper.reactionDelay * 0.58;
       this.keeper.anticipating = this.ball.progress >= anticipationStart && this.ball.progress <= this.keeper.reactionDelay;
@@ -797,7 +945,7 @@ class PenaltisGame {
             this.pendingOnlineTurn = null;
             // Let the save/impact read on screen before the next online turn
             // resets the ball and keeper to their ready positions.
-            setTimeout(() => this.setOnlineTurn(nextTurn), 360);
+            setTimeout(() => this.setOnlineTurn(nextTurn), 700);
           }
         }
       }
@@ -805,30 +953,44 @@ class PenaltisGame {
 
     if (this.ball.inNet) {
       const ball = this.ball;
-      ball.netAge += dt;
-      ball.velocityY += 390 * dt;
-      ball.x += ball.velocityX * dt;
-      ball.y += ball.velocityY * dt;
-      ball.velocityX *= Math.exp(-2.2 * dt);
-      ball.velocityY *= Math.exp(-.45 * dt);
-      ball.rotation += dt * ball.spin;
-      ball.spin *= Math.exp(-2.4 * dt);
-      const visibleRadius = this.ball.radius * this.ball.scale;
-      const left = this.goal.x + visibleRadius;
-      const right = this.goal.x + this.goal.w - visibleRadius;
-      const bottom = this.goal.y + this.goal.h - visibleRadius;
-      if (ball.x < left || ball.x > right) {
-        ball.x = Math.max(left, Math.min(right, ball.x));
-        ball.velocityX *= -.42;
-      }
-      if (ball.y > bottom) {
-        ball.y = bottom;
-        ball.velocityY *= -.34;
-        if (Math.abs(ball.velocityY) < 20) ball.velocityY = 0;
-      }
-      if (ball.netAge > 1.25) {
-        ball.inNet = false;
-        ball.velocityX = ball.velocityY = 0;
+      ball.netAccumulator = Math.min(.1, ball.netAccumulator + dt);
+      const step = 1 / 120;
+      while (ball.netAccumulator >= step) {
+        ball.netAge += step;
+        if (ball.netAge < .105) {
+          // The net first catches and compresses the ball; gravity takes over
+          // only after the mesh has absorbed the incoming impulse.
+          const catchDamping = Math.exp(-17 * step);
+          ball.velocityX *= catchDamping;
+          ball.velocityY *= catchDamping;
+        } else {
+          ball.velocityY += 640 * step;
+        }
+        ball.x += ball.velocityX * step;
+        ball.y += ball.velocityY * step;
+        ball.velocityX *= Math.exp(-3.2 * step);
+        ball.velocityY *= Math.exp(-1.15 * step);
+        ball.rotation += step * ball.spin;
+        ball.spin *= Math.exp(-2.4 * step);
+        const visibleRadius = ball.radius * ball.scale;
+        const left = this.goal.x + visibleRadius;
+        const right = this.goal.x + this.goal.w - visibleRadius;
+        const bottom = this.goal.y + this.goal.h - visibleRadius;
+        if (ball.x < left || ball.x > right) {
+          ball.x = Math.max(left, Math.min(right, ball.x));
+          ball.velocityX *= -.42;
+        }
+        if (ball.y > bottom) {
+          ball.y = bottom;
+          ball.velocityY *= -.34;
+          if (Math.abs(ball.velocityY) < 20) ball.velocityY = 0;
+        }
+        ball.netAccumulator -= step;
+        if (ball.netAge > 1.25) {
+          ball.inNet = false;
+          ball.velocityX = ball.velocityY = 0;
+          break;
+        }
       }
     }
 
@@ -838,14 +1000,19 @@ class PenaltisGame {
 
     if (this.ball.isDeflected) {
       const ball = this.ball;
-      ball.deflectAge += dt;
-      ball.velocityY += 520 * dt;
-      ball.x += ball.velocityX * dt;
-      ball.y += ball.velocityY * dt;
-      ball.velocityX *= Math.exp(-1.8 * dt);
-      ball.rotation += dt * ball.spin * 1.5;
-      ball.spin *= Math.exp(-.9 * dt);
-      ball.scale = Math.min(1, .38 + ball.deflectAge * .5);
+      ball.deflectAccumulator = Math.min(.1, ball.deflectAccumulator + dt);
+      const step = 1 / 120;
+      while (ball.deflectAccumulator >= step) {
+        ball.deflectAge += step;
+        ball.velocityY += 640 * step;
+        ball.x += ball.velocityX * step;
+        ball.y += ball.velocityY * step;
+        ball.velocityX *= Math.exp(-1.8 * step);
+        ball.rotation += step * ball.spin * 1.5;
+        ball.spin *= Math.exp(-.9 * step);
+        ball.deflectAccumulator -= step;
+      }
+      ball.scale = Math.min(1, .71 + ball.deflectAge * .28);
       if (ball.deflectAge > .9 || ball.y > 410) ball.isDeflected = false;
     }
 
@@ -863,47 +1030,7 @@ class PenaltisGame {
       this.ballFireTrail[i].radius *= 0.92;
       if (this.ballFireTrail[i].alpha <= 0) this.ballFireTrail.splice(i, 1);
     }
-
-    for (let r = 0; r <= this.netRows; r++) {
-      for (let c = 0; c <= this.netCols; c++) {
-        const node = this.netNodes[r][c];
-        const index = (r * (this.netCols + 1) + c) * 3;
-        this.netSnapshot[index] = node.x;
-        this.netSnapshot[index + 1] = node.y;
-        this.netSnapshot[index + 2] = node.depth;
-      }
-    }
-    for (let r = 0; r <= this.netRows; r++) {
-      for (let c = 0; c <= this.netCols; c++) {
-        const node = this.netNodes[r][c];
-        const index = (r * (this.netCols + 1) + c) * 3;
-        const edge = c === 0 || c === this.netCols || r === 0 || r === this.netRows;
-        if (edge) {
-          node.x = node.origX; node.y = node.origY; node.depth = node.origDepth;
-          node.vx = 0; node.vy = 0; node.vz = 0;
-          continue;
-        }
-        const left = index - 3, right = index + 3;
-        const up = index - (this.netCols + 1) * 3;
-        const down = index + (this.netCols + 1) * 3;
-        const neighborX = (this.netSnapshot[left] + this.netSnapshot[right]
-          + this.netSnapshot[up] + this.netSnapshot[down]) * .25;
-        const neighborY = (this.netSnapshot[left + 1] + this.netSnapshot[right + 1]
-          + this.netSnapshot[up + 1] + this.netSnapshot[down + 1]) * .25;
-        const neighborDepth = (this.netSnapshot[left + 2] + this.netSnapshot[right + 2]
-          + this.netSnapshot[up + 2] + this.netSnapshot[down + 2]) * .25;
-        const stiffness = 32;
-        node.vx += ((node.origX - node.x) * stiffness + (neighborX - node.x) * 9) * dt;
-        node.vy += ((node.origY - node.y) * stiffness + (neighborY - node.y) * 9) * dt;
-        node.vz += ((node.origDepth - node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
-        const damping = Math.exp(-5.2 * dt);
-        node.vx *= damping; node.vy *= damping; node.vz *= damping;
-        node.x += node.vx * dt; node.y += node.vy * dt; node.depth += node.vz * dt;
-        if (Math.abs(node.x - node.origX) < .0008 && Math.abs(node.vx) < .012) node.x = node.origX, node.vx = 0;
-        if (Math.abs(node.y - node.origY) < .0008 && Math.abs(node.vy) < .012) node.y = node.origY, node.vy = 0;
-        if (Math.abs(node.depth - node.origDepth) < .0008 && Math.abs(node.vz) < .012) node.depth = node.origDepth, node.vz = 0;
-      }
-    }
+    this.stepNetPhysics(dt);
 
     if (this.feedbackAlpha > 0) {
       this.feedbackAge += dt;
@@ -916,21 +1043,75 @@ class PenaltisGame {
     }
   }
 
-  bulgeNet(impactX, impactY, impactSpeed = 480) {
+  stepNetPhysics(dt) {
+    const fixedStep = 1 / 120;
+    this.netPhysicsAccumulator = Math.min(.1, this.netPhysicsAccumulator + dt);
+    let steps = 0;
+    while (this.netPhysicsAccumulator >= fixedStep && steps < 12) {
+      for (let r = 0; r <= this.netRows; r++) for (let c = 0; c <= this.netCols; c++) {
+        const node = this.netNodes[r][c];
+        node.prevX = node.x; node.prevY = node.y; node.prevDepth = node.depth;
+        if (!node.invMass) continue;
+        node.vy -= .35 * fixedStep;
+        node.x += node.vx * fixedStep;
+        node.y += node.vy * fixedStep;
+        node.depth += node.vz * fixedStep;
+      }
+
+      // Position Based Dynamics: repeated distance projections keep the net
+      // from stretching numerically while its pinned perimeter stays on frame.
+      for (let iteration = 0; iteration < 6; iteration++) {
+        for (const constraint of this.netConstraints) {
+          const { a, b } = constraint;
+          const dx = b.x - a.x, dy = b.y - a.y, dz = b.depth - a.depth;
+          const length = Math.hypot(dx, dy, dz);
+          const inverseMass = a.invMass + b.invMass;
+          if (length < 1e-6 || !inverseMass) continue;
+          const correction = (length - constraint.rest) * constraint.stiffness / (length * inverseMass);
+          if (a.invMass) {
+            a.x += dx * correction * a.invMass;
+            a.y += dy * correction * a.invMass;
+            a.depth += dz * correction * a.invMass;
+          }
+          if (b.invMass) {
+            b.x -= dx * correction * b.invMass;
+            b.y -= dy * correction * b.invMass;
+            b.depth -= dz * correction * b.invMass;
+          }
+        }
+      }
+
+      const damping = Math.exp(-1.4 * fixedStep);
+      for (let r = 0; r <= this.netRows; r++) for (let c = 0; c <= this.netCols; c++) {
+        const node = this.netNodes[r][c];
+        if (!node.invMass) {
+          node.x = node.origX; node.y = node.origY; node.depth = node.origDepth;
+          node.vx = node.vy = node.vz = 0;
+          continue;
+        }
+        node.vx = (node.x - node.prevX) / fixedStep * damping;
+        node.vy = (node.y - node.prevY) / fixedStep * damping;
+        node.vz = (node.depth - node.prevDepth) / fixedStep * damping;
+      }
+      this.netPhysicsAccumulator -= fixedStep;
+      steps++;
+    }
+  }
+
+  bulgeNet(impactX, impactY, impactSpeed = 16, lateralSpeed = 0) {
     const hitX = Math.max(0, Math.min(7.32, ((impactX - this.goal.x) / this.goal.w) * 7.32));
     const hitY = Math.max(0, Math.min(2.44, ((this.goal.y + this.goal.h - impactY) / this.goal.h) * 2.44));
-    const impulse = Math.max(2.4, Math.min(9.5, impactSpeed * .014));
+    const impulse = Math.max(3.2, Math.min(24, impactSpeed * .82));
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
         const dx = node.origX - hitX;
         const dy = node.origY - hitY;
-        const dist = Math.hypot(dx, dy * 1.35);
-        if (dist < 2.05) {
-          const falloff = Math.pow(1 - dist / 2.05, 2);
+        const dist = Math.hypot(dx, dy);
+        if (node.invMass && dist < 1.05) {
+          const falloff = Math.exp(-(dist * dist) / .22);
           node.vz += impulse * falloff;
-          node.vx += dx * falloff * 1.35;
-          node.vy += dy * falloff * 1.1;
+          node.vx += lateralSpeed * falloff * .035;
         }
       }
     }
@@ -941,19 +1122,22 @@ class PenaltisGame {
       this.ball.x = this.ball.selectedZone.x;
       this.ball.y = this.ball.selectedZone.y;
     }
-    this.ball.scale = 0.56;
+    this.ball.scale = .71;
     this.camera.shake = 0;
     this.camera.targetZoom = 1.0;
 
     if (isGoal) {
       this.ball.inNet = true;
       this.ball.netAge = 0;
-      this.ball.velocityX = Math.max(-42, Math.min(42, this.ball.flightVX * .045));
-      this.ball.velocityY = Math.max(-48, Math.min(48, this.ball.flightVY * .045));
+      this.ball.netAccumulator = 0;
+      this.ball.velocityX = Math.max(-28, Math.min(28, this.ball.flightVX * .055));
+      this.ball.velocityY = Math.max(-30, Math.min(30, this.ball.flightVY * .055));
       this.ball.result = 'goal';
       this.keeper.state = 'beaten';
+      const physics = this.ball.physicsState;
       this.bulgeNet(this.ball.targetX, this.ball.targetY,
-        Math.hypot(this.ball.flightVX, this.ball.flightVY));
+        physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 16,
+        physics?.vx || 0);
       this.spawnCelebrationFlares();
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -1038,15 +1222,18 @@ class PenaltisGame {
   triggerAnimeGoal() {
     this.ball.inNet = true;
     this.ball.netAge = 0;
-    this.ball.scale = .56;
-    this.ball.velocityX = Math.max(-42, Math.min(42, this.ball.flightVX * .045));
-    this.ball.velocityY = Math.max(-48, Math.min(48, this.ball.flightVY * .045));
+    this.ball.netAccumulator = 0;
+    this.ball.scale = .71;
+    this.ball.velocityX = Math.max(-28, Math.min(28, this.ball.flightVX * .055));
+    this.ball.velocityY = Math.max(-30, Math.min(30, this.ball.flightVY * .055));
     this.ball.result = 'goal';
     this.keeper.state = 'beaten';
 
     this.camera.shake = 0;
+    const physics = this.ball.physicsState;
     this.bulgeNet(this.ball.targetX, this.ball.targetY,
-      Math.hypot(this.ball.flightVX, this.ball.flightVY));
+      physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 16,
+      physics?.vx || 0);
     this.spawnCelebrationFlares();
 
     if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -1171,6 +1358,10 @@ class PenaltisGame {
     this.ball.inFlight = false;
     this.ball.inNet = false;
     this.ball.isDeflected = false;
+    this.ball.physicsState = null;
+    this.ball.physicsAccumulator = 0;
+    this.ball.netAccumulator = 0;
+    this.ball.deflectAccumulator = 0;
     this.keeper.catchContactTimer = 0;
     this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.selectedZone = null;
@@ -2061,29 +2252,45 @@ class PenaltisGame {
     ctx.clip();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(235,247,241,.92)';
-    ctx.shadowColor = 'rgba(5,14,18,.95)';
-    ctx.shadowBlur = 2.5;
-    ctx.lineWidth = 1.05;
-    const point = node => this.projectGoal3D(node.x, node.y, node.depth);
+    ctx.globalAlpha = Math.max(.48, 1 - ball.netAge / .34);
+    const point = node => {
+      const visualDepth = Math.max(0, node.depth + (node.depth - node.origDepth) * 7);
+      const perspective = 1 / (1 + visualDepth / 26.6);
+      return {
+        x: 200 + (node.x / 7.32 - .5) * 322 * perspective,
+        y: 287 + (310 - (node.y / 2.44) * 160 - 287) * perspective
+      };
+    };
     // For the first fraction of a second after impact, let the strands cross
     // the ball silhouette: this makes the ball read as caught in the mesh.
-    for (let r = 0; r <= this.netRows; r++) {
-      ctx.beginPath();
-      for (let c = 0; c <= this.netCols; c++) {
-        const p = point(this.netNodes[r][c]);
-        if (!c) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-      }
-      ctx.stroke();
-    }
-    for (let c = 0; c <= this.netCols; c++) {
-      ctx.beginPath();
+    const drawStrands = () => {
       for (let r = 0; r <= this.netRows; r++) {
-        const p = point(this.netNodes[r][c]);
-        if (!r) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        ctx.beginPath();
+        for (let c = 0; c <= this.netCols; c++) {
+          const p = point(this.netNodes[r][c]);
+          if (!c) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
-    }
+      for (let c = 0; c <= this.netCols; c++) {
+        ctx.beginPath();
+        for (let r = 0; r <= this.netRows; r++) {
+          const p = point(this.netNodes[r][c]);
+          if (!r) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+    };
+    ctx.strokeStyle = 'rgba(4,12,17,.92)';
+    ctx.shadowColor = 'rgba(0,0,0,.9)';
+    ctx.shadowBlur = 1.5;
+    ctx.lineWidth = 2.3;
+    drawStrands();
+    ctx.strokeStyle = 'rgba(235,247,241,.96)';
+    ctx.shadowColor = 'rgba(5,14,18,.8)';
+    ctx.shadowBlur = 2;
+    ctx.lineWidth = 1.1;
+    drawStrands();
     ctx.restore();
   }
 
@@ -2095,13 +2302,10 @@ class PenaltisGame {
     const flight = b.inFlight || b.inNet ? Math.min(1, b.progress || 1) : 0;
     const shadowX = b.inFlight ? b.x : b.inNet ? b.targetX : b.x;
     const goalLineY = 310;
-    const shadowPerspective = 1 / (1 + ((1 / .56) - 1) * flight);
-    const groundStartY = b.startY - 287;
-    const groundTargetY = (goalLineY - 287) / .56;
     const shadowY = b.inFlight || b.inNet
-      ? 287 + (groundStartY + (groundTargetY - groundStartY) * flight) * shadowPerspective
+      ? b.startY + (goalLineY - b.startY) * flight
       : b.y + b.radius * b.scale * .72;
-    const shadowScale = b.inFlight || b.inNet ? .96 * shadowPerspective : .92;
+    const shadowScale = b.inFlight || b.inNet ? .92 * b.scale : .92;
     ctx.globalAlpha = b.inFlight ? .22 - flight * .13 : b.inNet ? .08 : .24;
     ctx.fillStyle = '#02070a';
     ctx.filter = 'blur(5px)';
