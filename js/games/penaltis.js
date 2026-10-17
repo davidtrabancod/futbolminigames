@@ -270,6 +270,9 @@ class PenaltisGame {
       if (c + 2 <= this.netCols) addConstraint(r, c, r, c + 2, .025);
       if (r + 2 <= this.netRows) addConstraint(r, c, r + 2, c, .025);
     }
+    // The cloth starts at rest. Do not run the constraint solver until a shot
+    // actually excites the net.
+    this.netPhysicsActive = false;
   }
 
   reset() {
@@ -1130,6 +1133,7 @@ class PenaltisGame {
   }
 
   stepNetPhysics(dt) {
+    if (!this.netPhysicsActive) return;
     const fixedStep = 1 / 120;
     this.netPhysicsAccumulator = Math.min(.1, this.netPhysicsAccumulator + dt);
     let steps = 0;
@@ -1195,13 +1199,19 @@ class PenaltisGame {
           settled = false;
         }
       }
-      if (settled) this.netImpactPoint = null;
+      if (settled) {
+        this.netImpactPoint = null;
+        this.netPhysicsActive = false;
+        this.netPhysicsAccumulator = 0;
+        break;
+      }
       this.netPhysicsAccumulator -= fixedStep;
       steps++;
     }
   }
 
   bulgeNet(impactX, impactY, physics = null) {
+    this.netPhysicsActive = true;
     const impactSpeed = physics ? Math.hypot(physics.vx, physics.vy, physics.vz) : 8;
     const hitX = Math.max(0, Math.min(7.32,
       3.66 + (impactX - 200) / (this.goalPixelsPerMeterX * this.netPerspective)));

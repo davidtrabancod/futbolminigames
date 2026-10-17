@@ -290,7 +290,10 @@ class Football3DRenderer {
     this.height = height;
     // Supersample the small, fast-moving ball before compositing it into the
     // game's logical canvas, so its silhouette and panels stay crisp.
-    this.pixelRatio = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
+    // This texture is composited into a 400×600 game canvas and then scaled to
+    // the page. Supersampling above 1.5× made the full-frame WebGL pass costly
+    // on every shot, while antialiasing already keeps the ball edges smooth.
+    this.pixelRatio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
     this.canvas = document.createElement('canvas');
     this.canvas.width = Math.round(width * this.pixelRatio);
     this.canvas.height = Math.round(height * this.pixelRatio);
