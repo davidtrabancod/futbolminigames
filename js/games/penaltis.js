@@ -1199,7 +1199,7 @@ class PenaltisGame {
 
     const width = this.app.virtualWidth;
     const height = 22;
-    const y = this.app.virtualHeight * .442;
+    const y = this.app.virtualHeight * .466;
     const pad = 4;
     const separator = 42;
     const cycleWidth = ads.reduce((sum, ad) => sum + ad.width + separator, 0);
