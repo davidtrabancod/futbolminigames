@@ -386,20 +386,37 @@
     </section>
 
     <div id="onlineMatchResult" class="online-result hidden" role="status" aria-live="polite">
-      <span id="onlineResultMode" class="online-result__eyebrow">PARTIDA CLASIFICATORIA</span>
-      <span id="onlineResultIcon" class="online-result__icon">🏆</span>
-      <h2 id="onlineResultTitle">¡Victoria!</h2>
-      <p id="onlineResultSummary"></p>
-      <div class="online-result__scoreboard" aria-label="Marcador final">
-        <div><span id="onlineResultYouName">Tú</span><strong id="onlineResultYouScore">0</strong></div>
-        <span class="online-result__versus">VS</span>
-        <div><span id="onlineResultOpponentName">Rival</span><strong id="onlineResultOpponentScore">0</strong></div>
-      </div>
-      <div id="onlineRatingChange" class="online-rating-change"></div>
-      <p id="onlineResultRecord" class="online-result__record"></p>
-      <div class="online-result__actions">
-        <button id="onlinePlayAgainBtn" class="btn-arcade btn-arcade-green" type="button">🔄 Jugar otra vez</button>
-        <button id="onlineReturnBtn" class="btn-arcade btn-arcade-blue" type="button">🏠 Volver al menú</button>
+      <div class="online-result__card">
+        <div class="online-result__topline">
+          <span id="onlineResultMode" class="online-result__eyebrow">PARTIDA CLASIFICATORIA</span>
+          <span class="online-result__final-tag"><i></i> FINAL DEL ENCUENTRO</span>
+        </div>
+        <div class="online-result__hero">
+          <span id="onlineResultIcon" class="online-result__icon">&#127942;</span>
+          <div class="online-result__headline">
+            <h2 id="onlineResultTitle">&#161;Victoria!</h2>
+            <p id="onlineResultSummary"></p>
+          </div>
+        </div>
+        <div class="online-result__scoreboard" aria-label="Marcador final">
+          <div class="online-result__team online-result__team--you"><span id="onlineResultYouName">T&#250;</span><strong id="onlineResultYouScore">0</strong></div>
+          <span class="online-result__versus">VS</span>
+          <div class="online-result__team online-result__team--opponent"><span id="onlineResultOpponentName">Rival</span><strong id="onlineResultOpponentScore">0</strong></div>
+        </div>
+        <div class="online-result__details">
+          <div class="online-result__rating-card">
+            <span class="online-result__detail-label">RATING</span>
+            <div id="onlineRatingChange" class="online-rating-change"></div>
+          </div>
+          <div class="online-result__record-card">
+            <span class="online-result__detail-label">TEMPORADA</span>
+            <p id="onlineResultRecord" class="online-result__record"></p>
+          </div>
+        </div>
+        <div class="online-result__actions">
+          <button id="onlinePlayAgainBtn" class="btn-arcade btn-arcade-green" type="button">&#128260; Jugar otra vez</button>
+          <button id="onlineReturnBtn" class="btn-arcade btn-arcade-blue" type="button">&#127968; Volver al men&#250;</button>
+        </div>
       </div>
     </div>
 

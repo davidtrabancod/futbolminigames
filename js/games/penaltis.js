@@ -1380,11 +1380,11 @@ class PenaltisGame {
     for (let i = 0; i < launchX.length; i++) {
       const x = launchX[i] + (Math.random() - .5) * 30;
       const targetY = 38 + Math.random() * 92;
-      const duration = .88 + Math.random() * .34;
+      const duration = .68 + Math.random() * .2;
       this.goalFlares.push({
         x, y: this.app.virtualHeight * .516 + 4,
         startX: x, startY: this.app.virtualHeight * .516 + 4,
-        targetY, age: -i * .045, duration,
+        targetY, age: -i * .03, duration,
         phase: Math.random() * Math.PI * 2,
         hue: fireColors[i % fireColors.length], trail: []
       });
