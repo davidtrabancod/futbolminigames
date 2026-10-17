@@ -175,19 +175,35 @@ class Goal3DRenderer {
       const length = Math.hypot(dx, dy, dz) || 1;
       const normal = [0, 0, 1];
       const highlight = Math.min(.34, Math.abs(flex) * 1.2);
+      const midX = (a[0] + b[0]) * .5 + 3.66;
+      const midY = (a[1] + b[1]) * .5;
+      const hitDistance = impactPoint
+        ? Math.hypot(midX - impactPoint.x, midY - impactPoint.y)
+        : Infinity;
+      const impactGlow = Math.max(0, 1 - hitDistance / 1.15)
+        * Math.min(1, Math.abs(flex) * 3);
       const color = [
-        Math.min(1, baseColor[0] + highlight),
-        Math.min(1, baseColor[1] + highlight),
-        Math.min(1, baseColor[2] + highlight),
-        Math.min(.94, baseColor[3] + highlight * .75)
+        Math.min(1, baseColor[0] + highlight + impactGlow * .2),
+        Math.min(1, baseColor[1] + highlight + impactGlow * .2),
+        Math.min(1, baseColor[2] + highlight + impactGlow * .2),
+        Math.min(.97, baseColor[3] + highlight * .75 + impactGlow * .22)
       ];
       this.vertex(out, a, normal, color); this.vertex(out, b, normal, color);
     };
     const position = node => {
       const flex = node.depth - (node.origDepth ?? 1.8);
-      // Render the solved mesh directly. Radially scaling it around the hit
-      // point made the side columns spill past the posts during a hard shot.
-      return [node.x - 3.66, node.y, -Math.max(0, node.depth + flex * .35)];
+      // The camera compresses movement in depth strongly. Add a small,
+      // impact-centred in-plane spread so the pocket remains visible while
+      // preserving the solved cloth motion and its fixed perimeter.
+      const spread = Math.max(-.22, Math.min(.8, flex)) * .72;
+      const dx = impactPoint ? node.x - impactPoint.x : 0;
+      const dy = impactPoint ? node.y - impactPoint.y : 0;
+      const distance = Math.hypot(dx, dy) || 1;
+      return [
+        node.x - 3.66 + dx / distance * spread,
+        node.y + dy / distance * spread,
+        -Math.max(0, node.depth + flex * .35)
+      ];
     };
     if (nodes?.length) {
       for (let r = 0; r < nodes.length; r++) for (let c = 0; c < nodes[r].length; c++) {

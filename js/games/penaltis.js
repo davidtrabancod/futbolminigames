@@ -51,11 +51,11 @@ class PenaltisGame {
 
     // Las 5 Zonas de Disparo Táctico
     this.TARGET_ZONES = [
-      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', ...targetOnNet(1.02, 1.82) },
-      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', ...targetOnNet(6.30, 1.82) },
+      { id: 'top-left', name: 'Escuadra Izq.', shotName: '¡TIRO CON EFECTO! 🌪️', ...targetOnNet(.78, 2.02) },
+      { id: 'top-right', name: 'Escuadra Der.', shotName: '¡TIRO DEL HALCÓN! 🦅', ...targetOnNet(6.54, 2.02) },
       { id: 'center', name: 'Centro Misil', shotName: '¡TIRO DEL TIGRE! 🐯🔥', ...targetOnNet(3.66, 1.22) },
-      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', ...targetOnNet(1.02, .60) },
-      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', ...targetOnNet(6.30, .60) }
+      { id: 'bottom-left', name: 'Raso Izq.', shotName: '¡TIRO RASANTE! ⚡', ...targetOnNet(.78, .48) },
+      { id: 'bottom-right', name: 'Raso Der.', shotName: '¡TIRO CORTADO! 🌪️', ...targetOnNet(6.54, .48) }
     ];
 
     this.currentLevel = ARENA_LEVEL;
@@ -1177,8 +1177,12 @@ class PenaltisGame {
         if (node.invMass && dist < 1.25) {
           const falloff = Math.exp(-(dist * dist) / .3);
           node.vz += impulse * falloff;
-          node.vx += (physics?.vx || 0) * falloff * .12;
-          node.vy += (physics?.vy || 0) * falloff * .1;
+          // Depth alone is hard to read in this compressed stadium camera.
+          // Let the woven panel fan outward around the contact point as the
+          // ball drives it back, making the pocket visible without moving posts.
+          const radialKick = impulse * falloff * .2 / Math.max(dist, .12);
+          node.vx += dx * radialKick + (physics?.vx || 0) * falloff * .12;
+          node.vy += dy * radialKick + (physics?.vy || 0) * falloff * .1;
         }
       }
     }
