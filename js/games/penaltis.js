@@ -746,12 +746,12 @@ class PenaltisGame {
     // The center target has no horizontal side. Forcing it to +1 sent the
     // keeper anchor left while selecting the right-dive sprite pose.
     this.keeper.diveDirection = Math.sign(chosenZone.x - this.keeper.baseX);
-    // The detailed sprite's glove is high and wide from its foot anchor; the
-    // canvas fallback uses a compact, rotated body with gloves near its pivot.
+    // Place the final glove pose on the chosen ball endpoint. Each lane has its
+    // own contact geometry (high dive, low dive, or the two-handed center save).
     const detailedKeeper = this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER;
-    const gloveReachX = detailedKeeper ? 77 : 64;
-    this.keeper.targetX = chosenZone.x - this.keeper.diveDirection * gloveReachX;
-    this.keeper.targetY = chosenZone.y + (detailedKeeper ? 77 : -2);
+    const gloveOffset = detailedKeeper?.getContactOffset?.(keeperChoiceId);
+    this.keeper.targetX = gloveOffset ? chosenZone.x - gloveOffset.x : chosenZone.x - this.keeper.diveDirection * 64;
+    this.keeper.targetY = gloveOffset ? chosenZone.y - gloveOffset.y : chosenZone.y - 2;
     this.keeper.diveStartX = this.keeper.x;
     this.keeper.diveStartY = this.keeper.y;
     this.keeper.diveProgress = 0;
@@ -1011,12 +1011,12 @@ class PenaltisGame {
         this.keeper.diving = true;
         this.keeper.state = 'diving';
         const rawDive = Math.min(1, (this.ball.progress - this.keeper.reactionDelay) / Math.max(.12, 1 - this.keeper.reactionDelay));
-        const easedDive = 1 - Math.pow(1 - rawDive, 3);
-        this.keeper.diveProgress = easedDive;
-        this.keeper.x = this.keeper.diveStartX + (this.keeper.targetX - this.keeper.diveStartX) * easedDive;
+        const travel = rawDive * rawDive * (3 - 2 * rawDive);
+        this.keeper.diveProgress = rawDive;
+        this.keeper.x = this.keeper.diveStartX + (this.keeper.targetX - this.keeper.diveStartX) * travel;
         const leap = Math.sin(rawDive * Math.PI) * (this.keeper.targetY <= this.keeper.diveStartY ? 13 : 5);
-        this.keeper.y = this.keeper.diveStartY + (this.keeper.targetY - this.keeper.diveStartY) * easedDive - leap;
-        this.keeper.rotation = this.keeper.diveDirection * .88 * easedDive;
+        this.keeper.y = this.keeper.diveStartY + (this.keeper.targetY - this.keeper.diveStartY) * travel - leap;
+        this.keeper.rotation = this.keeper.diveDirection * .88 * travel;
         this.keeper.anticipating = false;
       }
 
@@ -2371,15 +2371,11 @@ class PenaltisGame {
     const lvl = this.currentLevel;
     const catching = this.ball?.result === 'saved' && k.catchContactTimer > 0;
     const divingPose = k.diving || catching;
-    const contactPoint = catching && this.ball.selectedZone
-      ? { x: this.ball.targetX, y: this.ball.targetY }
-      : null;
-
     if (this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
       window.GOALKEEPER_ROSTER.draw(
         ctx, this.onlineGoalkeeperId, k.x, k.y, 1, this.timer || 0,
         divingPose, k.rotation, k.diveProgress, k.anticipating, k.diveDirection, k.state, k.landingTimer,
-        contactPoint
+        k.diveZoneId
       );
       return;
     }

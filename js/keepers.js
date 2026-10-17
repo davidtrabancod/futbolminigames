@@ -20,14 +20,33 @@
   };
   const cardArt = typeof Image !== 'undefined' ? new Image() : null;
   const diveArt = typeof Image !== 'undefined' ? new Image() : null;
+  const centerArt = typeof Image !== 'undefined' ? new Image() : null;
+  const lowLeftArt = typeof Image !== 'undefined' ? new Image() : null;
+  const lowRightArt = typeof Image !== 'undefined' ? new Image() : null;
   if (diveArt) diveArt.src = './assets/goalkeeper-dive-frames.png';
+  if (centerArt) centerArt.src = './assets/goalkeeper-center-frames-v2.png';
+  if (lowLeftArt) lowLeftArt.src = './assets/goalkeeper-low-left-v2.png';
+  if (lowRightArt) lowRightArt.src = './assets/goalkeeper-low-right-v2.png';
   if (cardArt) {
     cardArt.src = './assets/goalkeeper-models.png';
     cardArt.onload = () => document.querySelectorAll('.keeper-card__portrait').forEach(canvas =>
       paintPortrait(canvas, canvas.dataset.keeperId, canvas.parentElement.classList.contains('is-equipped')));
   }
 
-  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0, ballContact = null) {
+  function getContactOffset(zoneId, scale = 1) {
+    if (zoneId === 'center') return { x: 42 * scale, y: 8 * scale };
+    if (zoneId?.startsWith('bottom')) return { x: (zoneId.endsWith('left') ? -70 : 70) * scale, y: 65 * scale };
+    const direction = zoneId?.endsWith('left') ? -1 : 1;
+    const angle = direction * -.035;
+    const gloveX = direction * 113 * scale * .68;
+    const gloveY = -72 * scale * .68;
+    return {
+      x: gloveX * Math.cos(angle) - gloveY * Math.sin(angle),
+      y: -28 + gloveX * Math.sin(angle) + gloveY * Math.cos(angle)
+    };
+  }
+
+  function draw(ctx, keeper, x = 0, y = 0, scale = 1, time = 0, diving = false, diveRotation = 0, diveProgress = 0, anticipating = false, diveDirection = 0, keeperState = 'idle', landingTimer = 0, zoneId = null) {
     if (!cardArt?.complete || !cardArt.naturalWidth) return;
     const p = byId(keeper);
     const frameSize = 256;
@@ -38,27 +57,19 @@
     const idlePhase = time * [1.2, 2.7, 1.1, .8, 1.9, 1.35, 1.05, .9][p.artIndex];
     const breath = Math.sin(idlePhase);
     const diveFrame = direction < 0 ? 2 : direction > 0 ? 3 : 1;
-    // The dive sprite's leading palm is at approximately (+/-113, -72) in
-    // source pixels relative to its center. Align that palm with the ball's
-    // center throughout the save pose, rather than aligning the torso.
-    let contactOffsetX = 0, contactOffsetY = 0;
-    if (diving && ballContact && direction) {
-      const gloveX = x + direction * 113 * spriteScale;
-      const gloveY = y - 28 - 72 * spriteScale;
-      const correction = Math.min(1, motion * 1.35);
-      contactOffsetX = (ballContact.x - gloveX) * correction;
-      contactOffsetY = (ballContact.y - gloveY) * correction;
-    }
-    const footX = x + contactOffsetX + (diving ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
-    const footY = y + 40 + breath * .8 - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
+    const center = zoneId === 'center';
+    const low = zoneId?.startsWith('bottom');
+    const finalAngle = direction * -.035;
+    const footX = x + (diving ? -direction * motion * 3 : Math.sin(idlePhase * .55) * 1.2);
+    const footY = y + 40 + (diving ? 0 : breath * .8) - (diving ? Math.sin(motion * Math.PI) * 5 : 0);
 
     const drawPose = (pose, alpha, offsetX = 0, offsetY = 0, angle = 0) => {
       if (alpha <= .01) return;
       const sourceX = pose * frameSize;
       const sourceY = p.artIndex * frameSize;
       const standing = pose < 2;
-      const anchorX = x + contactOffsetX + offsetX;
-      const anchorY = (standing ? footY : y - 28) + contactOffsetY + offsetY;
+      const anchorX = x + offsetX;
+      const anchorY = (standing ? footY : y - 28) + offsetY;
       const left = anchorX - frameSize * spriteScale / 2;
       const top = standing
         ? anchorY - 244 * spriteScale
@@ -71,20 +82,115 @@
       ctx.drawImage(cardArt, sourceX, sourceY, frameSize, frameSize, left, top, frameSize * spriteScale, frameSize * spriteScale);
       ctx.restore();
     };
-    const drawDivePose = (frame, alpha, offsetY = 0) => {
+    const drawDivePose = (frame, alpha, offsetY = 0, angle = 0) => {
       if (alpha <= .01 || !diveArt?.complete || !diveArt.naturalWidth) return;
-      const anchorX = x + contactOffsetX;
-      const anchorY = y - 28 + contactOffsetY + offsetY;
+      const anchorX = x;
+      const anchorY = y - 28 + offsetY;
       const left = anchorX - frameSize * spriteScale / 2;
       const top = anchorY - frameSize * spriteScale / 2;
       ctx.save();
       ctx.globalAlpha *= alpha;
       ctx.translate(anchorX, anchorY);
-      ctx.rotate(direction * -.035);
+      ctx.rotate(angle);
       ctx.translate(-anchorX, -anchorY);
       ctx.drawImage(diveArt, frame * frameSize, p.artIndex * frameSize, frameSize, frameSize,
         left, top, frameSize * spriteScale, frameSize * spriteScale);
       ctx.restore();
+    };
+
+    const drawCenterPose = (frame, alpha) => {
+      if (alpha <= .01 || !centerArt?.complete || !centerArt.naturalWidth) return;
+      const cell = centerArt.naturalWidth / 4;
+      const centerScale = scale * .78;
+      const size = cell * centerScale;
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      ctx.drawImage(centerArt, frame * cell, p.artIndex * cell, cell, cell,
+        x - size / 2, y - size / 2, size, size);
+      ctx.restore();
+    };
+
+    const drawLowPose = (frame, alpha, value) => {
+      const art = direction < 0 ? lowLeftArt : lowRightArt;
+      if (alpha <= .01 || !art?.complete || !art.naturalWidth) return;
+      const cell = art.naturalWidth / 4;
+      const size = cell * scale * .78;
+      const trimRight = frame < 3 ? 16 : 0;
+      // Early crouch frames have feet lower inside their cells than the dive
+      // frame. Keep them on the goal line and release that offset in flight.
+      const groundOffset = (1 - value) * 50;
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      ctx.drawImage(art, frame * cell, p.artIndex * cell, cell - trimRight, cell,
+        x - size / 2, y - groundOffset - size / 2, size * (1 - trimRight / cell), size);
+      ctx.restore();
+    };
+
+    // Every display refresh draws a frame between these hand-authored poses.
+    // Body travel and rotation are continuous; the brief pose transitions keep
+    // the illustrated limbs from popping without prolonged ghost silhouettes.
+    const blend = (start, end, value) => Math.max(0, Math.min(1, (value - start) / (end - start)));
+    const drawSideSequence = value => {
+      const lowArt = direction < 0 ? lowLeftArt : lowRightArt;
+      if (low && lowArt?.complete && lowArt.naturalWidth) {
+        if (value < .18) {
+          const mix = blend(.07, .18, value);
+          drawPose(1, 1 - mix);
+          drawLowPose(0, mix, value);
+        } else if (value < .44) {
+          const mix = blend(.35, .44, value);
+          drawLowPose(0, 1 - mix, value);
+          drawLowPose(1, mix, value);
+        } else if (value < .7) {
+          const mix = blend(.61, .7, value);
+          drawLowPose(1, 1 - mix, value);
+          drawLowPose(2, mix, value);
+        } else {
+          const mix = blend(.82, .96, value);
+          drawLowPose(2, 1 - mix, value);
+          drawLowPose(3, mix, value);
+        }
+        return;
+      }
+      const first = direction < 0 ? 0 : 3;
+      const angle = finalAngle * blend(.08, .92, value);
+      const settle = -Math.sin(value * Math.PI) * 5;
+      if (!diveArt?.complete || !diveArt.naturalWidth || !direction) {
+        drawPose(1, 1 - blend(.08, .2, value));
+        drawPose(diveFrame, blend(.08, .2, value), 0, settle, angle);
+      } else if (value < .16) {
+        const mix = blend(.05, .16, value);
+        drawPose(1, 1 - mix, 0, -2, direction * -.025);
+        drawDivePose(first, mix, settle, angle);
+      } else if (value < .43) {
+        const mix = blend(.34, .43, value);
+        drawDivePose(first, 1 - mix, settle, angle);
+        drawDivePose(first + 1, mix, settle, angle);
+      } else if (value < .69) {
+        const mix = blend(.6, .69, value);
+        drawDivePose(first + 1, 1 - mix, settle, angle);
+        drawDivePose(first + 2, mix, settle, angle);
+      } else {
+        const mix = blend(.82, .96, value);
+        drawDivePose(first + 2, 1 - mix, settle, angle);
+        drawPose(diveFrame, mix, 0, settle, angle);
+      }
+    };
+
+    const drawCenterSequence = value => {
+      if (!centerArt?.complete || !centerArt.naturalWidth) {
+        drawPose(1, 1);
+        return;
+      }
+      if (value < .49) {
+        const mix = blend(.36, .49, value);
+        drawCenterPose(0, 1 - mix);
+        drawCenterPose(1, mix);
+      } else {
+        const mix = blend(.64, .8, value);
+        drawCenterPose(1, 1 - mix);
+        drawCenterPose(2, mix);
+      }
     };
 
     ctx.save();
@@ -95,7 +201,7 @@
     ctx.fill();
     ctx.restore();
 
-    if (diving) {
+    if (diving && !low) {
       ctx.save();
       ctx.globalAlpha = .16 + motion * .18;
       ctx.strokeStyle = p.colors[0];
@@ -121,35 +227,15 @@
     }
 
     if (diving) {
-      if (diveArt?.complete && diveArt.naturalWidth && direction) {
-        // Each keeper has three illustrated transition poses per side. Keep
-        // them as distinct animation frames; blending every pose made a visible
-        // double image. Only blend into the first and final poses.
-        const poseBlend = Math.min(1, motion / .13);
-        const firstFrame = direction < 0 ? 0 : 3;
-        const settle = -Math.sin(motion * Math.PI) * 5;
-        drawPose(1, 1 - poseBlend, 0, -2, direction * -.025);
-        if (motion < .8) {
-          const phase = Math.max(0, (motion - .13) / .67) * 3;
-          const stage = Math.min(2, Math.floor(phase));
-          const fadeToNext = stage === 2 ? 0 : Math.max(0, (phase - stage - .84) / .16);
-          drawDivePose(firstFrame + stage, poseBlend * (1 - fadeToNext), settle);
-          if (fadeToNext > 0) drawDivePose(firstFrame + stage + 1, poseBlend * fadeToNext, settle);
-        } else {
-          const finish = Math.min(1, (motion - .8) / .12);
-          drawDivePose(firstFrame + 2, poseBlend * (1 - finish), settle);
-          drawPose(diveFrame, poseBlend * finish, 0, settle, direction * -.035);
-        }
-      } else {
-        // Keep the original art animation as a fallback while the atlas loads.
-        const diveBlend = Math.min(1, motion / .16);
-        drawPose(1, 1 - diveBlend, 0, -2, direction * -.025);
-        if (motion > .12) drawPose(diveFrame, .1 * (1-motion), -direction * 20, 6, direction * -.04);
-        drawPose(diveFrame, diveBlend, 0, -Math.sin(motion * Math.PI) * 5, direction * -.035);
-      }
+      if (center) drawCenterSequence(motion);
+      else drawSideSequence(motion);
     } else if (landing > 0) {
-      drawPose(diveFrame, landing, 0, 0, diveRotation * .035 * landing);
-      drawPose(0, 1 - landing, 0, 0, 0);
+      if (landing < .05) {
+        drawPose(0, 1 - landing / .05);
+        if (center) drawCenterPose(0, landing / .05);
+        else drawPose(1, landing / .05);
+      } else if (center) drawCenterSequence(landing);
+      else drawSideSequence(landing);
     } else if (anticipating) {
       drawPose(1, 1, 0, -2, direction * -.025);
     } else {
@@ -257,5 +343,5 @@
     ctx.fillStyle=shine;ctx.fillRect(0,0,width,height);
     ctx.strokeStyle=bright;ctx.globalAlpha=selected?.95:.55;ctx.lineWidth=selected?2.5:1.2;ctx.strokeRect(2,2,width-4,height-4);ctx.globalAlpha=1;
   }
-  return { roster, byId, draw, paintPortrait };
+  return { roster, byId, draw, paintPortrait, getContactOffset };
 });
