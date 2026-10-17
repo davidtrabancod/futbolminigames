@@ -1936,6 +1936,8 @@ body {
 .header-rating.is-updating { animation: ratingUpdated 850ms ease-out; }
 
 .online-match { position: relative; }
+.game-screen--online-scoreboard #gameHudStats,
+.game-screen--online-scoreboard #hudHistoryContainer { display: none !important; }
 .game-hud__forfeit {
   display: inline-grid;
   width: 2.25rem;

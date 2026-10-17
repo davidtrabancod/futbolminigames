@@ -387,15 +387,30 @@ class PenaltisGame {
     ctx.save();
     const boxX = 168, boxY = 8, boxW = 624, boxH = 74;
     const centerX = boxX + boxW / 2;
-    const myName = (this.onlineMyName || 'T?').toUpperCase();
+    const myName = (this.onlineMyName || 'TU').toUpperCase();
     const oppName = (this.onlineOppName || 'RIVAL').toUpperCase();
     const myScore = this.onlineMyScore ?? 0;
     const oppScore = this.onlineOppScore ?? 0;
     const myHistory = this.onlineMyHistory || [];
     const oppHistory = this.onlineOppHistory || [];
+    const roundLabel = this.onlineRoundLabel || 'RONDA 1 / 3';
     const suddenDeath = this.onlineMyShotsTotal > 3 || this.onlineOppShotsTotal > 3
       || (myHistory.length >= 3 && oppHistory.length >= 3 && myScore === oppScore);
     const pulse = .5 + .5 * Math.sin(this.timer * 3.2);
+    const panelPath = inset => {
+      const x = boxX + inset, y = boxY + inset;
+      const w = boxW - inset * 2, h = boxH - inset * 2, cut = Math.max(7, 16 - inset * .4);
+      ctx.beginPath();
+      ctx.moveTo(x + cut, y);
+      ctx.lineTo(x + w - cut, y);
+      ctx.lineTo(x + w, y + cut);
+      ctx.lineTo(x + w, y + h - cut);
+      ctx.lineTo(x + w - cut, y + h);
+      ctx.lineTo(x + cut, y + h);
+      ctx.lineTo(x, y + h - cut);
+      ctx.lineTo(x, y + cut);
+      ctx.closePath();
+    };
 
     // Deep glass panel, layered edge light and a traveling polished highlight.
     ctx.shadowColor = 'rgba(25, 226, 238, .56)';
@@ -406,21 +421,18 @@ class PenaltisGame {
     background.addColorStop(.48, 'rgba(11, 17, 35, .98)');
     background.addColorStop(1, 'rgba(4, 11, 20, .98)');
     ctx.fillStyle = background;
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 15);
+    panelPath(0);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
     ctx.strokeStyle = 'rgba(86, 244, 255, ' + (.52 + pulse * .3) + ')';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 15);
+    panelPath(0);
     ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.1)';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(boxX + 4, boxY + 4, boxW - 8, boxH - 8, 12);
+    panelPath(4);
     ctx.stroke();
 
     // Team-colored light rails frame the two score columns.
@@ -442,8 +454,7 @@ class PenaltisGame {
 
     const sweepX = boxX + 20 + ((this.timer * .32) % 1) * (boxW - 40);
     ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(boxX + 5, boxY + 4, boxW - 10, boxH - 8, 12);
+    panelPath(5);
     ctx.clip();
     ctx.globalCompositeOperation = 'lighter';
     const sweep = ctx.createLinearGradient(sweepX - 30, boxY, sweepX + 30, boxY);
@@ -470,14 +481,14 @@ class PenaltisGame {
     ctx.shadowColor = '#ffd866';
     ctx.shadowBlur = 9;
     ctx.fillStyle = '#ffe68a';
-    ctx.font = '900 9px Fredoka, sans-serif';
+    ctx.font = '800 9px Bungee, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('VS', centerX, boxY + 24);
     ctx.shadowBlur = 0;
 
     // Player names and large score digits.
-    ctx.font = '800 10px Fredoka, sans-serif';
+    ctx.font = '700 10px "Chakra Petch", sans-serif';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#8deeff';
@@ -498,7 +509,7 @@ class PenaltisGame {
       ctx.save();
       ctx.translate(x, boxY + 50);
       ctx.scale(scale, scale);
-      ctx.font = '900 43px Fredoka, sans-serif';
+      ctx.font = '900 49px "Barlow Condensed", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.lineWidth = 3;
@@ -516,6 +527,21 @@ class PenaltisGame {
     this._scoreboardOppScore = oppScore;
     drawScore(myScore, boxX + 190, '#25d9ff', this._scorePulseMy);
     drawScore(oppScore, boxX + boxW - 190, '#ff5478', this._scorePulseOpp);
+
+    const suddenDeathLabel = roundLabel.includes('SÚBITA');
+    const roundWidth = suddenDeathLabel ? 132 : 112;
+    ctx.fillStyle = suddenDeathLabel ? 'rgba(88, 54, 12, .94)' : 'rgba(8, 36, 49, .96)';
+    ctx.strokeStyle = suddenDeathLabel ? 'rgba(255, 202, 89, .88)' : 'rgba(86, 224, 242, .62)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(centerX - roundWidth / 2, boxY + 52, roundWidth, 17, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = suddenDeathLabel ? '#ffe08b' : '#8beaf4';
+    ctx.font = '800 11px "Chakra Petch", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(roundLabel, centerX, boxY + 60.5, roundWidth - 10);
 
     // Attempt lights; the sudden-death attempt has a gold rim.
     const drawAttempts = (history, startX, direction) => {
@@ -1575,12 +1601,12 @@ class PenaltisGame {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(220,240,248,.72)';
-    ctx.font = '700 8px Fredoka, sans-serif';
+    ctx.font = '700 8px "Chakra Petch", sans-serif';
     ctx.fillText('TU TURNO', x + 47, y + 9);
     ctx.fillStyle = accent;
     ctx.shadowColor = accent;
     ctx.shadowBlur = 9;
-    ctx.font = '900 14px Fredoka, sans-serif';
+    ctx.font = '900 17px "Barlow Condensed", sans-serif';
     ctx.fillText(isShooter ? 'LANZADOR' : 'PORTERO', x + 47, y + 21);
     ctx.shadowBlur = 0;
 

@@ -220,6 +220,7 @@ class App {
   startMinigame(gameId) {
     if (!this.games[gameId]) return;
 
+    this.gameScreen.classList.remove('game-screen--online-scoreboard');
     this.activeGameId = gameId;
     this.activeGame = this.games[gameId];
     this.gameState = 'playing';
@@ -330,6 +331,7 @@ class App {
     this.activeGame = null;
     this.activeGameId = null;
 
+    this.gameScreen.classList.remove('game-screen--online-scoreboard');
     this.menuScreen.classList.remove('hidden');
     this.menuScreen.style.removeProperty('display');
     this.onlineMatchScreen.classList.add('hidden');

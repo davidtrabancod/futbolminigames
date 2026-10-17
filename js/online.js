@@ -711,6 +711,7 @@ class OnlineArena {
     this.playerIndex = message.playerIndex;
     this.matchActive = true;
     this.actionSubmitted = false;
+    this.app.gameScreen?.classList.add('game-screen--online-scoreboard');
     const you = message.you || this.user || {};
     const opponent = message.opponent || {};
     const isNormal = message.mode === 'ranked' && (you.isGuest || opponent.isGuest);
@@ -813,6 +814,9 @@ class OnlineArena {
     }
 
     if (this.app.games && this.app.games.penaltis) {
+      this.app.games.penaltis.onlineRoundLabel = message.suddenDeath
+        ? 'MUERTE SÚBITA'
+        : `RONDA ${message.round || 1} / 3`;
       if (typeof this.app.games.penaltis.setOnlineTurn === 'function') {
         this.app.games.penaltis.setOnlineTurn(message);
       }
@@ -931,6 +935,7 @@ class OnlineArena {
 
     if (updatedUser) this.setUser(updatedUser);
     this.app.gameState = 'online-result';
+    this.app.gameScreen?.classList.remove('game-screen--online-scoreboard');
     this.app.gameScreen?.classList.add('hidden');
     if (this.app.gameScreen) this.app.gameScreen.style.display = 'none';
     this.refs.onlineMatchResult.classList.remove('hidden', 'is-win', 'is-loss', 'is-draw');
