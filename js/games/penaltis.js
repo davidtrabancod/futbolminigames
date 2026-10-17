@@ -153,6 +153,7 @@ class PenaltisGame {
     this.ball.inNet = false;
     this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.isDeflected = false;
+    this.keeper.catchContactTimer = 0;
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
     if (!recoveringKeeper) {
@@ -247,6 +248,7 @@ class PenaltisGame {
       diveStartX: 200,
       diveStartY: 270,
       anticipating: false,
+      catchContactTimer: 0,
       diveSpeed: lvl.diveSpeed,
       reactionDelay: lvl.reactionDelay,
       guessRate: lvl.guessRate,
@@ -609,6 +611,7 @@ class PenaltisGame {
     this.camera.targetZoom = 1.0;
     this.camera.shake = 0;
     this.ball.isDeflected = false;
+    this.keeper.catchContactTimer = 0;
 
     const lvl = this.currentLevel;
     if (!keeperChoiceId) {
@@ -623,10 +626,13 @@ class PenaltisGame {
 
     const chosenZone = this.TARGET_ZONES.find(z => z.id === keeperChoiceId) || this.TARGET_ZONES[2];
     this.keeper.diveZoneId = keeperChoiceId;
-    this.keeper.diveDirection = Math.sign(chosenZone.x - this.keeper.baseX);
-    // Move the torso toward the shot while the leading glove reaches the actual corner.
-    this.keeper.targetX = chosenZone.x - this.keeper.diveDirection * 58;
-    this.keeper.targetY = keeperChoiceId === 'center' ? 220 : chosenZone.y;
+    this.keeper.diveDirection = Math.sign(chosenZone.x - this.keeper.baseX) || 1;
+    // The detailed sprite's glove is high and wide from its foot anchor; the
+    // canvas fallback uses a compact, rotated body with gloves near its pivot.
+    const detailedKeeper = this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER;
+    const gloveReachX = detailedKeeper ? 77 : 64;
+    this.keeper.targetX = chosenZone.x - this.keeper.diveDirection * gloveReachX;
+    this.keeper.targetY = chosenZone.y + (detailedKeeper ? 77 : -2);
     this.keeper.diveStartX = this.keeper.x;
     this.keeper.diveStartY = this.keeper.y;
     this.keeper.diveProgress = 0;
@@ -737,8 +743,8 @@ class PenaltisGame {
       this.ball.progress += dt / this.ball.flightTime;
       const t = Math.min(1.0, this.ball.progress);
       const targetArc = this.ball.targetY < 210 ? 18 : this.ball.targetY > 260 ? 34 : 26;
-      const depthCurve = 1.63;
-      const targetPerspective = 1 / (1 + depthCurve);
+      const targetPerspective = 0.56;
+      const depthCurve = (1 / targetPerspective) - 1;
       const perspective = 1 / (1 + depthCurve * t);
       const perspectiveRate = -depthCurve * perspective * perspective;
 
@@ -786,7 +792,13 @@ class PenaltisGame {
         } else {
           this.resolveOnlineVisualOutcomeDirect(this.onlineVisualTurnRole, this.onlineVisualIsGoal);
           this.state = 'aiming';
-          if (this.pendingOnlineTurn) this.setOnlineTurn(this.pendingOnlineTurn);
+          if (this.pendingOnlineTurn) {
+            const nextTurn = this.pendingOnlineTurn;
+            this.pendingOnlineTurn = null;
+            // Let the save/impact read on screen before the next online turn
+            // resets the ball and keeper to their ready positions.
+            setTimeout(() => this.setOnlineTurn(nextTurn), 360);
+          }
         }
       }
     }
@@ -818,6 +830,10 @@ class PenaltisGame {
         ball.inNet = false;
         ball.velocityX = ball.velocityY = 0;
       }
+    }
+
+    if (this.keeper.catchContactTimer > 0) {
+      this.keeper.catchContactTimer = Math.max(0, this.keeper.catchContactTimer - dt);
     }
 
     if (this.ball.isDeflected) {
@@ -903,18 +919,18 @@ class PenaltisGame {
   bulgeNet(impactX, impactY, impactSpeed = 480) {
     const hitX = Math.max(0, Math.min(7.32, ((impactX - this.goal.x) / this.goal.w) * 7.32));
     const hitY = Math.max(0, Math.min(2.44, ((this.goal.y + this.goal.h - impactY) / this.goal.h) * 2.44));
-    const impulse = Math.max(1.1, Math.min(5.2, impactSpeed * .008));
+    const impulse = Math.max(2.4, Math.min(9.5, impactSpeed * .014));
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
         const dx = node.origX - hitX;
         const dy = node.origY - hitY;
         const dist = Math.hypot(dx, dy * 1.35);
-        if (dist < 1.6) {
-          const falloff = Math.pow(1 - dist / 1.6, 2);
+        if (dist < 2.05) {
+          const falloff = Math.pow(1 - dist / 2.05, 2);
           node.vz += impulse * falloff;
-          node.vx += dx * falloff * .8;
-          node.vy += dy * falloff * .7;
+          node.vx += dx * falloff * 1.35;
+          node.vy += dy * falloff * 1.1;
         }
       }
     }
@@ -925,15 +941,15 @@ class PenaltisGame {
       this.ball.x = this.ball.selectedZone.x;
       this.ball.y = this.ball.selectedZone.y;
     }
-    this.ball.scale = 0.38;
+    this.ball.scale = 0.56;
     this.camera.shake = 0;
     this.camera.targetZoom = 1.0;
 
     if (isGoal) {
       this.ball.inNet = true;
       this.ball.netAge = 0;
-      this.ball.velocityX = Math.max(-72, Math.min(72, this.ball.flightVX * .12));
-      this.ball.velocityY = Math.max(-95, Math.min(95, this.ball.flightVY * .12));
+      this.ball.velocityX = Math.max(-42, Math.min(42, this.ball.flightVX * .045));
+      this.ball.velocityY = Math.max(-48, Math.min(48, this.ball.flightVY * .045));
       this.ball.result = 'goal';
       this.keeper.state = 'beaten';
       this.bulgeNet(this.ball.targetX, this.ball.targetY,
@@ -948,6 +964,9 @@ class PenaltisGame {
     } else {
       this.ball.result = 'saved';
       this.keeper.state = 'saved';
+      this.keeper.diving = true;
+      this.keeper.diveProgress = 1;
+      this.keeper.catchContactTimer = .22;
       this.deflectBallFromKeeper();
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -975,6 +994,9 @@ class PenaltisGame {
       this.ball.inNet = false;
       this.ball.result = 'saved';
       this.keeper.state = 'saved';
+      this.keeper.diving = true;
+      this.keeper.diveProgress = 1;
+      this.keeper.catchContactTimer = .22;
       this.deflectBallFromKeeper();
       this.streak = 0;
       this.history.push('saved');
@@ -1016,8 +1038,9 @@ class PenaltisGame {
   triggerAnimeGoal() {
     this.ball.inNet = true;
     this.ball.netAge = 0;
-    this.ball.velocityX = Math.max(-72, Math.min(72, this.ball.flightVX * .12));
-    this.ball.velocityY = Math.max(-95, Math.min(95, this.ball.flightVY * .12));
+    this.ball.scale = .56;
+    this.ball.velocityX = Math.max(-42, Math.min(42, this.ball.flightVX * .045));
+    this.ball.velocityY = Math.max(-48, Math.min(48, this.ball.flightVY * .045));
     this.ball.result = 'goal';
     this.keeper.state = 'beaten';
 
@@ -1148,6 +1171,7 @@ class PenaltisGame {
     this.ball.inFlight = false;
     this.ball.inNet = false;
     this.ball.isDeflected = false;
+    this.keeper.catchContactTimer = 0;
     this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.selectedZone = null;
 
@@ -1899,14 +1923,17 @@ class PenaltisGame {
   renderCountryGoalkeeper(ctx) {
     const k = this.keeper;
     const lvl = this.currentLevel;
+    const catching = this.ball?.result === 'saved' && k.catchContactTimer > 0;
+    const divingPose = k.diving || catching;
+    const contactPoint = catching && this.ball.selectedZone
+      ? { x: this.ball.targetX, y: this.ball.targetY }
+      : null;
 
     if (this.isOnlineMode && this.onlineGoalkeeperId && window.GOALKEEPER_ROSTER) {
       window.GOALKEEPER_ROSTER.draw(
         ctx, this.onlineGoalkeeperId, k.x, k.y, 1, this.timer || 0,
-        k.diving, k.rotation, k.diveProgress, k.anticipating, k.diveDirection, k.state, k.landingTimer,
-        this.onlineVisualIsGoal === false && this.ball?.selectedZone
-          ? { x: this.ball.targetX, y: this.ball.targetY }
-          : null
+        divingPose, k.rotation, k.diveProgress, k.anticipating, k.diveDirection, k.state, k.landingTimer,
+        contactPoint
       );
       return;
     }
@@ -1989,8 +2016,8 @@ class PenaltisGame {
       ctx.fill();
     }
 
-    const span = k.diving ? 44 : 28;
-    const gy = k.diving ? -48 : -14;
+    const span = divingPose ? 44 : 28;
+    const gy = divingPose ? -48 : -14;
     this.drawKeeperGlove(ctx, -span, gy, false);
     this.drawKeeperGlove(ctx, span, gy, true);
 
@@ -2025,6 +2052,41 @@ class PenaltisGame {
     ctx.restore();
   }
 
+  renderNetContactOverlay(ctx, ball) {
+    const radius = ball.radius * ball.scale;
+    if (radius <= 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, radius * .98, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(235,247,241,.92)';
+    ctx.shadowColor = 'rgba(5,14,18,.95)';
+    ctx.shadowBlur = 2.5;
+    ctx.lineWidth = 1.05;
+    const point = node => this.projectGoal3D(node.x, node.y, node.depth);
+    // For the first fraction of a second after impact, let the strands cross
+    // the ball silhouette: this makes the ball read as caught in the mesh.
+    for (let r = 0; r <= this.netRows; r++) {
+      ctx.beginPath();
+      for (let c = 0; c <= this.netCols; c++) {
+        const p = point(this.netNodes[r][c]);
+        if (!c) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    for (let c = 0; c <= this.netCols; c++) {
+      ctx.beginPath();
+      for (let r = 0; r <= this.netRows; r++) {
+        const p = point(this.netNodes[r][c]);
+        if (!r) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   renderAnimeBall(ctx) {
     const b = this.ball;
     ctx.save();
@@ -2033,9 +2095,9 @@ class PenaltisGame {
     const flight = b.inFlight || b.inNet ? Math.min(1, b.progress || 1) : 0;
     const shadowX = b.inFlight ? b.x : b.inNet ? b.targetX : b.x;
     const goalLineY = 310;
-    const shadowPerspective = 1 / (1 + 1.63 * flight);
+    const shadowPerspective = 1 / (1 + ((1 / .56) - 1) * flight);
     const groundStartY = b.startY - 287;
-    const groundTargetY = (goalLineY - 287) / .38;
+    const groundTargetY = (goalLineY - 287) / .56;
     const shadowY = b.inFlight || b.inNet
       ? 287 + (groundStartY + (groundTargetY - groundStartY) * flight) * shadowPerspective
       : b.y + b.radius * b.scale * .72;
@@ -2053,6 +2115,7 @@ class PenaltisGame {
       try {
         this.football3D.draw(b);
         ctx.drawImage(this.football3D.canvas, 0, 0, this.vWidth, this.vHeight);
+        if (b.inNet && b.netAge < .24) this.renderNetContactOverlay(ctx, b);
         ctx.restore();
         return;
       } catch (error) {
