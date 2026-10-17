@@ -579,8 +579,8 @@ class OnlineArena {
     intro.classList.add('is-active');
     this.matchIntroTimer = window.setTimeout(() => {
       intro.classList.add('is-revealing');
-      this.matchIntroTimer = window.setTimeout(() => this.clearMatchIntro(), 540);
-    }, 760);
+      this.matchIntroTimer = window.setTimeout(() => this.clearMatchIntro(), 680);
+    }, 1100);
   }
 
   clearMatchIntro() {
