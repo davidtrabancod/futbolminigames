@@ -145,6 +145,7 @@ class PenaltisGame {
     this.ball.inFlight = false;
     this.ball.inNet = false;
     this.ball.velocityX = this.ball.velocityY = 0;
+    this.ball.isDeflected = false;
     this.ball.x = this.ball.startX;
     this.ball.y = this.ball.startY;
     if (!recoveringKeeper) {
@@ -165,7 +166,7 @@ class PenaltisGame {
     const targetZone = this.TARGET_ZONES.find(z => z.id === shooterZoneId) || this.TARGET_ZONES[2];
     this.onlineVisualTurnRole = turnRole;
     this.onlineVisualIsGoal = isGoal;
-    this.ball.flightTime = 0.42;
+    this.ball.flightTime = 0.68;
     this.launchAnimeShot(targetZone, keeperZoneId);
   }
   // ----------------------
@@ -200,6 +201,7 @@ class PenaltisGame {
         };
       }
     }
+    this.netSnapshot = new Float32Array((this.netRows + 1) * (this.netCols + 1) * 3);
   }
 
   reset() {
@@ -254,8 +256,13 @@ class PenaltisGame {
       targetX: 200,
       targetY: 200,
       progress: 0,
-      flightTime: 0.54,
+      flightTime: 0.68,
       rotation: 0,
+      spin: 0,
+      flightVX: 0,
+      flightVY: 0,
+      isDeflected: false,
+      deflectAge: 0,
       velocityX: 0,
       velocityY: 0,
       inNet: false,
@@ -581,6 +588,9 @@ class PenaltisGame {
     this.ball.targetY = zone.y;
     this.ball.selectedZone = zone;
     this.ball.result = null;
+    this.ball.flightVX = 0;
+    this.ball.flightVY = 0;
+    this.ball.spin = (Math.random() < .5 ? -1 : 1) * (8 + Math.random() * 7);
 
     if (window.soundManager.playAnimeShot) {
       window.soundManager.playAnimeShot();
@@ -588,10 +598,10 @@ class PenaltisGame {
       window.soundManager.playKick();
     }
 
-    this.spawnMangaSpeedLines();
     // Keep the stadium and goal locked in place during the shot.
     this.camera.targetZoom = 1.0;
     this.camera.shake = 0;
+    this.ball.isDeflected = false;
 
     const lvl = this.currentLevel;
     if (!keeperChoiceId) {
@@ -719,22 +729,20 @@ class PenaltisGame {
     if (this.state === 'shooting' && this.ball.inFlight) {
       this.ball.progress += dt / this.ball.flightTime;
       const t = Math.min(1.0, this.ball.progress);
+      const depthProgress = t;
+      const lateralCurve = Math.sin(Math.PI * t) * this.ball.spin * .52;
+      const targetArc = this.ball.targetY < 210 ? 18 : this.ball.targetY > 260 ? 34 : 26;
 
-      const midX = (this.ball.startX + this.ball.targetX) * 0.5;
-      const midY = (this.ball.startY + this.ball.targetY) * 0.38;
-
-      this.ball.x = (1 - t) * (1 - t) * this.ball.startX + 2 * (1 - t) * t * midX + t * t * this.ball.targetX;
-      this.ball.y = (1 - t) * (1 - t) * this.ball.startY + 2 * (1 - t) * t * midY + t * t * this.ball.targetY;
-      this.ball.scale = 1.0 - t * 0.65;
-      this.ball.rotation += dt * 25;
-
-      this.ballFireTrail.push({
-        x: this.ball.x,
-        y: this.ball.y,
-        radius: this.ball.radius * this.ball.scale * 1.3,
-        alpha: 0.9,
-        color: t > 0.5 ? '#f97316' : '#facc15'
-      });
+      // Flight arc and depth shrink toward the goal; the shadow stays on the pitch.
+      this.ball.x = this.ball.startX + (this.ball.targetX - this.ball.startX) * depthProgress + lateralCurve;
+      this.ball.y = this.ball.startY + (this.ball.targetY - this.ball.startY) * depthProgress
+        - targetArc * 4 * t * (1 - t);
+      this.ball.scale = 1 - .62 * depthProgress;
+      this.ball.flightVX = ((this.ball.targetX - this.ball.startX)
+        + this.ball.spin * .52 * Math.PI * Math.cos(Math.PI * t)) / this.ball.flightTime;
+      this.ball.flightVY = ((this.ball.targetY - this.ball.startY)
+        - 4 * targetArc * (1 - 2 * t)) / this.ball.flightTime;
+      this.ball.rotation += dt * this.ball.spin;
 
       const anticipationStart = this.keeper.reactionDelay * 0.58;
       this.keeper.anticipating = this.ball.progress >= anticipationStart && this.ball.progress <= this.keeper.reactionDelay;
@@ -775,9 +783,12 @@ class PenaltisGame {
       ball.y += ball.velocityY * dt;
       ball.velocityX *= Math.exp(-2.2 * dt);
       ball.velocityY *= Math.exp(-.45 * dt);
-      ball.rotation += dt * 5;
-      const left = this.goal.x + 17, right = this.goal.x + this.goal.w - 17;
-      const bottom = this.goal.y + this.goal.h - 18;
+      ball.rotation += dt * ball.spin;
+      ball.spin *= Math.exp(-2.4 * dt);
+      const visibleRadius = this.ball.radius * this.ball.scale;
+      const left = this.goal.x + visibleRadius;
+      const right = this.goal.x + this.goal.w - visibleRadius;
+      const bottom = this.goal.y + this.goal.h - visibleRadius;
       if (ball.x < left || ball.x > right) {
         ball.x = Math.max(left, Math.min(right, ball.x));
         ball.velocityX *= -.42;
@@ -791,6 +802,19 @@ class PenaltisGame {
         ball.inNet = false;
         ball.velocityX = ball.velocityY = 0;
       }
+    }
+
+    if (this.ball.isDeflected) {
+      const ball = this.ball;
+      ball.deflectAge += dt;
+      ball.velocityY += 520 * dt;
+      ball.x += ball.velocityX * dt;
+      ball.y += ball.velocityY * dt;
+      ball.velocityX *= Math.exp(-1.8 * dt);
+      ball.rotation += dt * ball.spin * 1.5;
+      ball.spin *= Math.exp(-.9 * dt);
+      ball.scale = Math.min(1, .38 + ball.deflectAge * .5);
+      if (ball.deflectAge > .9 || ball.y > 410) ball.isDeflected = false;
     }
 
     if (this.isOnlineMode && !this.ball.inFlight && ['saved', 'beaten'].includes(this.keeper.state)) {
@@ -811,15 +835,32 @@ class PenaltisGame {
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
-        const left = this.netNodes[r][Math.max(0, c - 1)];
-        const right = this.netNodes[r][Math.min(this.netCols, c + 1)];
-        const up = this.netNodes[Math.max(0, r - 1)][c];
-        const down = this.netNodes[Math.min(this.netRows, r + 1)][c];
+        const index = (r * (this.netCols + 1) + c) * 3;
+        this.netSnapshot[index] = node.x;
+        this.netSnapshot[index + 1] = node.y;
+        this.netSnapshot[index + 2] = node.depth;
+      }
+    }
+    for (let r = 0; r <= this.netRows; r++) {
+      for (let c = 0; c <= this.netCols; c++) {
+        const node = this.netNodes[r][c];
+        const index = (r * (this.netCols + 1) + c) * 3;
         const edge = c === 0 || c === this.netCols || r === 0 || r === this.netRows;
-        const stiffness = edge ? 68 : 32;
-        const neighborX = (left.x + right.x + up.x + down.x) * .25;
-        const neighborY = (left.y + right.y + up.y + down.y) * .25;
-        const neighborDepth = (left.depth + right.depth + up.depth + down.depth) * .25;
+        if (edge) {
+          node.x = node.origX; node.y = node.origY; node.depth = node.origDepth;
+          node.vx = 0; node.vy = 0; node.vz = 0;
+          continue;
+        }
+        const left = index - 3, right = index + 3;
+        const up = index - (this.netCols + 1) * 3;
+        const down = index + (this.netCols + 1) * 3;
+        const neighborX = (this.netSnapshot[left] + this.netSnapshot[right]
+          + this.netSnapshot[up] + this.netSnapshot[down]) * .25;
+        const neighborY = (this.netSnapshot[left + 1] + this.netSnapshot[right + 1]
+          + this.netSnapshot[up + 1] + this.netSnapshot[down + 1]) * .25;
+        const neighborDepth = (this.netSnapshot[left + 2] + this.netSnapshot[right + 2]
+          + this.netSnapshot[up + 2] + this.netSnapshot[down + 2]) * .25;
+        const stiffness = 32;
         node.vx += ((node.origX - node.x) * stiffness + (neighborX - node.x) * 9) * dt;
         node.vy += ((node.origY - node.y) * stiffness + (neighborY - node.y) * 9) * dt;
         node.vz += ((node.origDepth - node.depth) * stiffness * .8 + (neighborDepth - node.depth) * 8) * dt;
@@ -843,21 +884,21 @@ class PenaltisGame {
     }
   }
 
-  bulgeNet(impactX, impactY, depth = 45) {
+  bulgeNet(impactX, impactY, impactSpeed = 480) {
     const hitX = Math.max(0, Math.min(7.32, ((impactX - this.goal.x) / this.goal.w) * 7.32));
     const hitY = Math.max(0, Math.min(2.44, ((this.goal.y + this.goal.h - impactY) / this.goal.h) * 2.44));
-    const impulse = Math.max(.8, Math.min(4.4, depth * .075));
+    const impulse = Math.max(1.1, Math.min(5.2, impactSpeed * .008));
     for (let r = 0; r <= this.netRows; r++) {
       for (let c = 0; c <= this.netCols; c++) {
         const node = this.netNodes[r][c];
         const dx = node.origX - hitX;
         const dy = node.origY - hitY;
         const dist = Math.hypot(dx, dy * 1.35);
-        if (dist < 1.35) {
-          const falloff = Math.pow(1 - dist / 1.35, 2);
+        if (dist < 1.6) {
+          const falloff = Math.pow(1 - dist / 1.6, 2);
           node.vz += impulse * falloff;
-          node.vx += dx * falloff * .72;
-          node.vy += dy * falloff * .62;
+          node.vx += dx * falloff * .8;
+          node.vy += dy * falloff * .7;
         }
       }
     }
@@ -868,18 +909,19 @@ class PenaltisGame {
       this.ball.x = this.ball.selectedZone.x;
       this.ball.y = this.ball.selectedZone.y;
     }
-    this.ball.scale = 0.6;
+    this.ball.scale = 0.38;
     this.camera.shake = 0;
     this.camera.targetZoom = 1.0;
 
     if (isGoal) {
       this.ball.inNet = true;
       this.ball.netAge = 0;
-      this.ball.velocityX = (this.ball.startX - this.ball.targetX) * .34;
-      this.ball.velocityY = 86;
+      this.ball.velocityX = Math.max(-72, Math.min(72, this.ball.flightVX * .12));
+      this.ball.velocityY = Math.max(-95, Math.min(95, this.ball.flightVY * .12));
       this.ball.result = 'goal';
       this.keeper.state = 'beaten';
-      this.bulgeNet(this.ball.targetX, this.ball.targetY, 50);
+      this.bulgeNet(this.ball.targetX, this.ball.targetY,
+        Math.hypot(this.ball.flightVX, this.ball.flightVY));
       this.spawnCelebrationFlares();
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -890,6 +932,7 @@ class PenaltisGame {
     } else {
       this.ball.result = 'saved';
       this.keeper.state = 'saved';
+      this.deflectBallFromKeeper();
 
       if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
       window.soundManager.playCatch();
@@ -916,6 +959,7 @@ class PenaltisGame {
       this.ball.inNet = false;
       this.ball.result = 'saved';
       this.keeper.state = 'saved';
+      this.deflectBallFromKeeper();
       this.streak = 0;
       this.history.push('saved');
       this.camera.shake = 0;
@@ -956,13 +1000,14 @@ class PenaltisGame {
   triggerAnimeGoal() {
     this.ball.inNet = true;
     this.ball.netAge = 0;
-    this.ball.velocityX = (this.ball.startX - this.ball.targetX) * .34;
-    this.ball.velocityY = 86;
+    this.ball.velocityX = Math.max(-72, Math.min(72, this.ball.flightVX * .12));
+    this.ball.velocityY = Math.max(-95, Math.min(95, this.ball.flightVY * .12));
     this.ball.result = 'goal';
     this.keeper.state = 'beaten';
 
     this.camera.shake = 0;
-    this.bulgeNet(this.ball.targetX, this.ball.targetY, 50);
+    this.bulgeNet(this.ball.targetX, this.ball.targetY,
+      Math.hypot(this.ball.flightVX, this.ball.flightVY));
     this.spawnCelebrationFlares();
 
     if (window.soundManager.playAnimeImpact) window.soundManager.playAnimeImpact();
@@ -971,6 +1016,13 @@ class PenaltisGame {
     window.soundManager.playCrowdCheer();
 
     this.feedbackAlpha = 0;
+  }
+
+  deflectBallFromKeeper() {
+    this.ball.isDeflected = true;
+    this.ball.deflectAge = 0;
+    this.ball.velocityX = this.keeper.diveDirection * 62 + this.ball.flightVX * .08;
+    this.ball.velocityY = Math.max(70, this.ball.flightVY * .06);
   }
 
   spawnCelebrationFlares() {
@@ -1079,6 +1131,7 @@ class PenaltisGame {
     this.ball.result = null;
     this.ball.inFlight = false;
     this.ball.inNet = false;
+    this.ball.isDeflected = false;
     this.ball.velocityX = this.ball.velocityY = 0;
     this.ball.selectedZone = null;
 
@@ -1961,15 +2014,18 @@ class PenaltisGame {
     ctx.save();
 
     // The shadow stays on the turf while the ball rises toward the goal.
-    const flight = b.inFlight ? b.progress : 0;
-    const shadowX = b.startX + (b.targetX - b.startX) * flight;
-    const shadowY = b.inFlight ? b.startY + (b.targetY - b.startY) * flight * .12 + 18 : b.y + b.radius * b.scale * .72;
-    const shadowScale = b.inFlight ? .82 + flight * .24 : .92;
-    ctx.globalAlpha = b.inFlight ? .25 - flight * .09 : b.inNet ? .16 : .24;
+    const flight = b.inFlight || b.inNet ? Math.min(1, b.progress || 1) : 0;
+    const shadowX = b.inFlight || b.inNet ? b.startX + (b.targetX - b.startX) * flight : b.x;
+    const goalLineY = 310;
+    const shadowY = b.inFlight || b.inNet
+      ? b.startY + (goalLineY - b.startY) * flight
+      : b.y + b.radius * b.scale * .72;
+    const shadowScale = b.inFlight || b.inNet ? .96 - flight * .46 : .92;
+    ctx.globalAlpha = b.inFlight ? .22 - flight * .13 : b.inNet ? .08 : .24;
     ctx.fillStyle = '#02070a';
     ctx.filter = 'blur(5px)';
     ctx.beginPath();
-    ctx.ellipse(shadowX, shadowY, b.radius * b.scale * shadowScale, b.radius * b.scale * .3, 0, 0, Math.PI * 2);
+    ctx.ellipse(shadowX, shadowY, b.radius * shadowScale, b.radius * .25 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.filter = 'none';
     ctx.globalAlpha = 1;
@@ -2019,10 +2075,10 @@ class PenaltisGame {
     ctx.fillStyle = sheen; ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
     ctx.restore();
 
-    ctx.strokeStyle = b.inFlight ? 'rgba(255,248,216,.95)' : 'rgba(225,241,247,.9)';
-    ctx.lineWidth = b.inFlight ? 2.6 : 2;
-    ctx.shadowColor = b.inFlight ? 'rgba(255,180,59,.75)' : 'rgba(220,245,255,.4)';
-    ctx.shadowBlur = b.inFlight ? 11 : 4;
+    ctx.strokeStyle = 'rgba(22,35,45,.48)';
+    ctx.lineWidth = 1.15;
+    ctx.shadowColor = 'rgba(225,242,255,.42)';
+    ctx.shadowBlur = b.inFlight ? 2.5 : 1.5;
     ctx.beginPath(); ctx.arc(0, 0, radius - 1, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
