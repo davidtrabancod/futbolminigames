@@ -7,7 +7,7 @@ class Goal3DRenderer {
     this.canvas.width = width;
     this.canvas.height = height;
     this.gl = this.canvas.getContext('webgl', {
-      alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true
+      alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: false
     });
     if (!this.gl) throw new Error('WebGL is unavailable');
     this.program = this.createProgram();
@@ -15,6 +15,16 @@ class Goal3DRenderer {
     this.netBuffer = this.gl.createBuffer();
     this.frameData = [];
     this.buildFrame();
+    this.frameData = new Float32Array(this.frameData);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.frameData, this.gl.STATIC_DRAW);
+    this.attributes = {
+      position: this.gl.getAttribLocation(this.program, 'aPosition'),
+      normal: this.gl.getAttribLocation(this.program, 'aNormal'),
+      color: this.gl.getAttribLocation(this.program, 'aColor')
+    };
+    this.restNetData = null;
+    this.netBufferMode = null;
   }
 
   createProgram() {
@@ -158,9 +168,7 @@ class Goal3DRenderer {
   configureAttributes() {
     const gl = this.gl;
     const stride = 10 * 4;
-    const position = gl.getAttribLocation(this.program, 'aPosition');
-    const normal = gl.getAttribLocation(this.program, 'aNormal');
-    const color = gl.getAttribLocation(this.program, 'aColor');
+    const { position, normal, color } = this.attributes;
     gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 3, gl.FLOAT, false, stride, 0);
     gl.enableVertexAttribArray(normal); gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, stride, 3 * 4);
     gl.enableVertexAttribArray(color); gl.vertexAttribPointer(color, 4, gl.FLOAT, false, stride, 6 * 4);
@@ -268,12 +276,25 @@ class Goal3DRenderer {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(this.program);
 
-    this.bindBuffer(this.positionBuffer, this.frameData);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
     this.configureAttributes();
     gl.drawArrays(gl.TRIANGLES, 0, this.frameData.length / 10);
 
-    const net = this.buildNet(nodes, impactPoint);
-    this.bindBuffer(this.netBuffer, net);
+    let net;
+    if (!impactPoint) {
+      if (!this.restNetData) this.restNetData = this.buildNet(nodes, null);
+      net = this.restNetData;
+      if (this.netBufferMode !== 'rest') {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.netBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, net, gl.STATIC_DRAW);
+        this.netBufferMode = 'rest';
+      }
+    } else {
+      net = this.buildNet(nodes, impactPoint);
+      this.bindBuffer(this.netBuffer, net);
+      this.netBufferMode = 'dynamic';
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.netBuffer);
     this.configureAttributes();
     gl.depthMask(false);
     gl.drawArrays(gl.LINES, 0, net.length / 10);
@@ -288,20 +309,31 @@ class Football3DRenderer {
   constructor(width = 400, height = 600) {
     this.width = width;
     this.height = height;
+    this.viewSize = 96;
     // Supersample the small, fast-moving ball before compositing it into the
     // game's logical canvas, so its silhouette and panels stay crisp.
-    // This texture is composited into a 400×600 game canvas and then scaled to
-    // the page. Supersampling above 1.5× made the full-frame WebGL pass costly
-    // on every shot, while antialiasing already keeps the ball edges smooth.
+    // Match the page's pixel density without forcing 2× rendering on normal
+    // displays; antialiasing keeps the ball silhouette clean.
     this.pixelRatio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
     this.canvas = document.createElement('canvas');
-    this.canvas.width = Math.round(width * this.pixelRatio);
-    this.canvas.height = Math.round(height * this.pixelRatio);
+    this.canvas.width = Math.round(this.viewSize * this.pixelRatio);
+    this.canvas.height = Math.round(this.viewSize * this.pixelRatio);
     this.gl = this.canvas.getContext('webgl', {
-      alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true
+      alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: false
     });
     if (!this.gl) throw new Error('WebGL is unavailable for the football');
     this.program = this.createBallProgram();
+    this.attributes = {
+      position: this.gl.getAttribLocation(this.program, 'aPosition'),
+      normal: this.gl.getAttribLocation(this.program, 'aNormal'),
+      color: this.gl.getAttribLocation(this.program, 'aColor')
+    };
+    this.uniforms = {
+      center: this.gl.getUniformLocation(this.program, 'uCenter'),
+      viewport: this.gl.getUniformLocation(this.program, 'uViewport'),
+      radius: this.gl.getUniformLocation(this.program, 'uRadius'),
+      rotation: this.gl.getUniformLocation(this.program, 'uRotation')
+    };
     this.triangleBuffer = this.gl.createBuffer();
     this.seamBuffer = this.gl.createBuffer();
     const mesh = this.buildSoccerBall();
@@ -325,6 +357,7 @@ class Football3DRenderer {
       attribute vec3 aNormal;
       attribute vec4 aColor;
       uniform vec2 uCenter;
+      uniform vec2 uViewport;
       uniform float uRadius;
       uniform float uRotation;
       varying vec3 vNormal;
@@ -343,7 +376,8 @@ class Football3DRenderer {
         n = vec3(n.x, n.y * cx - n.z * sx, n.y * sx + n.z * cx);
         float px = uCenter.x + p.x * uRadius;
         float py = uCenter.y - p.y * uRadius;
-        gl_Position = vec4(px / 200.0 - 1.0, 1.0 - py / 300.0,
+        gl_Position = vec4(px / uViewport.x * 2.0 - 1.0,
+                           1.0 - py / uViewport.y * 2.0,
                            0.28 - p.z * 0.25, 1.0);
         vNormal = normalize(n);
         vColor = aColor;
@@ -461,9 +495,7 @@ class Football3DRenderer {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     const stride = 10 * 4;
-    const position = gl.getAttribLocation(this.program, 'aPosition');
-    const normal = gl.getAttribLocation(this.program, 'aNormal');
-    const color = gl.getAttribLocation(this.program, 'aColor');
+    const { position, normal, color } = this.attributes;
     gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 3, gl.FLOAT, false, stride, 0);
     gl.enableVertexAttribArray(normal); gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, stride, 3 * 4);
     gl.enableVertexAttribArray(color); gl.vertexAttribPointer(color, 4, gl.FLOAT, false, stride, 6 * 4);
@@ -480,9 +512,10 @@ class Football3DRenderer {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(this.program);
-    gl.uniform2f(gl.getUniformLocation(this.program, 'uCenter'), ball.x, ball.y);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uRadius'), ball.radius * ball.scale);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uRotation'), ball.rotation);
+    gl.uniform2f(this.uniforms.center, this.viewSize / 2, this.viewSize / 2);
+    gl.uniform2f(this.uniforms.viewport, this.viewSize, this.viewSize);
+    gl.uniform1f(this.uniforms.radius, ball.radius * ball.scale);
+    gl.uniform1f(this.uniforms.rotation, ball.rotation);
     this.bindAttributes(this.triangleBuffer);
     gl.drawArrays(gl.TRIANGLES, 0, this.triangleData.length / 10);
     this.bindAttributes(this.seamBuffer);

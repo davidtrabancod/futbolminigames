@@ -11,6 +11,7 @@ class OnlineArena {
     this.matchPollStopped = true;
     this.matchId = null;
     this.matchEventCursor = 0;
+    this.matchIntroTimer = null;
     this.authMode = 'login';
     this.selectedAvatar = '⚽';
     this.playerIndex = 0;
@@ -42,6 +43,9 @@ class OnlineArena {
       guestPromptText: document.getElementById('guestPromptText'),
       guestRegisterBtn: document.getElementById('guestRegisterBtn'),
       matchmakingBanner: document.getElementById('matchmakingBanner'),
+      matchIntro: document.getElementById('matchIntro'),
+      matchIntroYou: document.getElementById('matchIntroYou'),
+      matchIntroOpponent: document.getElementById('matchIntroOpponent'),
       goalkeeperRoster: document.getElementById('goalkeeperRoster'),
       goalkeeperSelectionStatus: document.getElementById('goalkeeperSelectionStatus'),
       featuredKeeperPortrait: document.getElementById('featuredKeeperPortrait'),
@@ -554,12 +558,37 @@ class OnlineArena {
   }
 
   resetOnlineControls() {
+    this.clearMatchIntro();
     this.setMatchmakingLoading(false);
     this.refs.cancelOnlineBtn.classList.add('hidden');
     this.refs.rankedMatchBtn.disabled = false;
     this.refs.createFriendlyBtn.disabled = false;
     this.refs.guestPrompt?.classList.toggle('hidden', Boolean(this.user && !this.user.isGuest));
     this.refs.forfeitOnlineBtn.disabled = false;
+  }
+
+  playMatchIntro(youName, opponentName) {
+    const intro = this.refs.matchIntro;
+    if (!intro) return;
+    this.clearMatchIntro();
+    this.refs.matchIntroYou.textContent = youName || 'TÚ';
+    this.refs.matchIntroOpponent.textContent = opponentName || 'RIVAL';
+    intro.classList.remove('is-revealing', 'is-active');
+    // Force a clean animation when a second match starts quickly.
+    void intro.offsetWidth;
+    intro.classList.add('is-active');
+    this.matchIntroTimer = window.setTimeout(() => {
+      intro.classList.add('is-revealing');
+      this.matchIntroTimer = window.setTimeout(() => this.clearMatchIntro(), 540);
+    }, 760);
+  }
+
+  clearMatchIntro() {
+    if (this.matchIntroTimer) {
+      window.clearTimeout(this.matchIntroTimer);
+      this.matchIntroTimer = null;
+    }
+    this.refs.matchIntro?.classList.remove('is-active', 'is-revealing');
   }
 
   async startRankedQueue() {
@@ -788,6 +817,10 @@ class OnlineArena {
         });
       }
     }
+
+    const introYou = message.you?.nickname || message.you?.name || this.user?.nickname || 'TÚ';
+    const introOpponent = message.opponent?.nickname || message.opponent?.name || (typeof message.opponent === 'string' ? message.opponent : 'RIVAL');
+    this.playMatchIntro(introYou, introOpponent);
   }
 
   showTurn(message) {
@@ -904,6 +937,7 @@ class OnlineArena {
   }
 
   showOnlineResult(message) {
+    this.clearMatchIntro();
     const penaltyGame = this.app.games?.penaltis;
     const ball = penaltyGame?.ball;
     if (penaltyGame?.isOnlineMode && ball && (ball.inFlight || ball.inNet || ball.isDeflected)) {

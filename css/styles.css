@@ -2989,6 +2989,149 @@ body > footer {
   .matchmaking-banner__track span { animation: none; }
 }
 
+/* Brief arcade match reveal between matchmaking and the live penalty arena. */
+.match-intro {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  color: #ecfff8;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(14, 88, 68, .84), rgba(3, 14, 22, .97) 62%),
+    #041018;
+}
+.match-intro.is-active {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  animation: matchIntroBackdrop .25s ease-out both;
+}
+.match-intro::before,
+.match-intro::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+.match-intro::before {
+  opacity: .2;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(192, 255, 229, .13) 4px, transparent 5px);
+}
+.match-intro::after {
+  inset: -30%;
+  opacity: .32;
+  background: linear-gradient(112deg, transparent 42%, rgba(74, 255, 190, .18) 49%, rgba(255, 221, 103, .2) 50%, transparent 57%);
+  transform: translateX(-100%);
+}
+.match-intro.is-active::after { animation: matchIntroSweep .8s .1s ease-out both; }
+.match-intro__scanline {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: min(88vw, 74rem);
+  border-inline: 1px solid rgba(102, 255, 204, .2);
+  background: linear-gradient(90deg, transparent, rgba(23, 64, 66, .12) 50%, transparent);
+  transform: translateX(-50%);
+}
+.match-intro__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: min(92vw, 60rem);
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(.8rem, 2.8vh, 1.45rem);
+  padding: 2rem 1rem;
+  text-align: center;
+}
+.match-intro__eyebrow,
+.match-intro__caption {
+  color: #6bf2cb;
+  font: 800 clamp(.62rem, 1.7vw, .82rem) var(--font-kids);
+  letter-spacing: .24em;
+  text-shadow: 0 0 16px rgba(66, 255, 196, .52);
+}
+.match-intro__title {
+  color: #fff3b0;
+  font: 900 clamp(1.6rem, 6vw, 4rem) var(--font-display);
+  letter-spacing: .055em;
+  line-height: .95;
+  text-shadow: 0 3px #80641d, 0 0 34px rgba(255, 213, 72, .5);
+  animation: matchIntroTitle .55s cubic-bezier(.16, 1, .3, 1) both;
+}
+.match-intro__versus {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(.55rem, 3vw, 2rem);
+}
+.match-intro__player {
+  min-width: 0;
+  padding: clamp(.7rem, 2vw, 1.1rem) clamp(.5rem, 2vw, 1.4rem);
+  overflow: hidden;
+  border: 1px solid rgba(113, 255, 208, .52);
+  border-radius: .65rem;
+  background: linear-gradient(135deg, rgba(7, 37, 44, .92), rgba(5, 17, 27, .94));
+  box-shadow: inset 0 1px rgba(255,255,255,.12), 0 0 24px rgba(39, 224, 170, .18);
+  color: #e4fff5;
+  font: 900 clamp(.85rem, 3vw, 1.7rem) var(--font-display);
+  letter-spacing: .035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.match-intro__player--you { animation: matchIntroLeft .58s .08s cubic-bezier(.2, .8, .2, 1) both; }
+.match-intro__player--rival {
+  border-color: rgba(255, 111, 143, .58);
+  box-shadow: inset 0 1px rgba(255,255,255,.12), 0 0 24px rgba(255, 73, 118, .19);
+  color: #ffe3ec;
+  animation: matchIntroRight .58s .08s cubic-bezier(.2, .8, .2, 1) both;
+}
+.match-intro__vs {
+  color: #ffdc68;
+  font: 900 clamp(1rem, 3.5vw, 2rem) var(--font-display);
+  text-shadow: 0 0 20px rgba(255, 212, 75, .72);
+  animation: matchIntroVs .7s .22s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+.match-intro__caption { color: #cadbd8; font-size: .65rem; }
+.match-intro__wipe {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: linear-gradient(112deg, #c9ff74 0%, #58f4c7 45%, #23c9de 100%);
+  box-shadow: 0 0 48px rgba(91, 255, 207, .62);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  transform: translateX(-105%);
+}
+.match-intro.is-revealing .match-intro__wipe { animation: matchIntroWipe .52s cubic-bezier(.72, 0, .24, 1) both; }
+.match-intro.is-revealing { animation: matchIntroExit .16s .38s ease-in both; }
+@keyframes matchIntroBackdrop { from { opacity: 0; } to { opacity: 1; } }
+@keyframes matchIntroSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+@keyframes matchIntroTitle { from { opacity: 0; transform: translateY(18px) scale(.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes matchIntroLeft { from { opacity: 0; transform: translateX(-9vw) skewX(-8deg); } to { opacity: 1; transform: translateX(0) skewX(0); } }
+@keyframes matchIntroRight { from { opacity: 0; transform: translateX(9vw) skewX(8deg); } to { opacity: 1; transform: translateX(0) skewX(0); } }
+@keyframes matchIntroVs { from { opacity: 0; transform: scale(2.2) rotate(-12deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes matchIntroWipe { 0% { transform: translateX(-105%); } 55% { transform: translateX(0); } 100% { transform: translateX(105%); } }
+@keyframes matchIntroExit { to { opacity: 0; visibility: hidden; } }
+@media (max-width: 480px) {
+  .match-intro__content { width: 96vw; }
+  .match-intro__versus { gap: .4rem; }
+  .match-intro__player { padding-inline: .4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .match-intro.is-active,
+  .match-intro.is-active::after,
+  .match-intro__title,
+  .match-intro__player,
+  .match-intro__vs,
+  .match-intro.is-revealing,
+  .match-intro.is-revealing .match-intro__wipe { animation-duration: .01ms !important; animation-delay: 0ms !important; }
+}
+
 /* Competitive arcade treatment for the home arena and its main headline. */
 .menu-heading {
   position:relative;

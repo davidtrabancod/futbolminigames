@@ -2566,7 +2566,9 @@ class PenaltisGame {
     if (this.football3D) {
       try {
         this.football3D.draw(b);
-        ctx.drawImage(this.football3D.canvas, 0, 0, this.vWidth, this.vHeight);
+        const ballFrame = this.football3D.viewSize;
+        ctx.drawImage(this.football3D.canvas,
+          b.x - ballFrame / 2, b.y - ballFrame / 2, ballFrame, ballFrame);
         if (b.inNet && b.netAge < .24) this.renderNetContactOverlay(ctx, b);
         ctx.restore();
         return;
