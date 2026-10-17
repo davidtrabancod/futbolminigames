@@ -1198,8 +1198,8 @@ class PenaltisGame {
     if (!ads?.length) return;
 
     const width = this.app.virtualWidth;
-    const height = 22;
-    const y = this.app.virtualHeight * .466;
+    const height = 26;
+    const y = this.app.virtualHeight * .46;
     const pad = 4;
     const separator = 42;
     const cycleWidth = ads.reduce((sum, ad) => sum + ad.width + separator, 0);
@@ -1229,7 +1229,7 @@ class PenaltisGame {
     ctx.clip();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '900 10px "Chakra Petch", "Arial Narrow", sans-serif';
+    ctx.font = '900 11px "Chakra Petch", "Arial Narrow", sans-serif';
     const firstCycleX = -offset;
     const cycles = Math.ceil(width / cycleWidth) + 1;
     for (let cycle = -1; cycle < cycles; cycle++) {
@@ -1238,7 +1238,7 @@ class PenaltisGame {
         const centerX = x + ad.width / 2;
         const image = ad.image;
         if (image?.complete && image.naturalWidth) {
-          const scale = Math.min((ad.width - 18) / image.naturalWidth, 14 / image.naturalHeight);
+          const scale = Math.min((ad.width - 18) / image.naturalWidth, 18 / image.naturalHeight);
           const drawW = image.naturalWidth * scale;
           const drawH = image.naturalHeight * scale;
           ctx.drawImage(image, centerX - drawW / 2, y + (height - drawH) / 2, drawW, drawH);
