@@ -453,16 +453,18 @@ class PenaltisGame {
 
     // Team-colored light rails frame the two score columns.
     const rail = (x, color, direction) => {
-      const gradient = ctx.createLinearGradient(x, 0, x + direction * 150, 0);
+      const length = 174;
+      const railX = direction > 0 ? x : x - length;
+      const gradient = ctx.createLinearGradient(x, 0, x + direction * length, 0);
       gradient.addColorStop(0, color);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
-      ctx.fillRect(x, boxY + 6, 174, 3);
+      ctx.fillRect(railX, boxY + 6, length, 3);
       ctx.save();
       ctx.shadowColor = color;
       ctx.shadowBlur = 16;
       ctx.fillStyle = color;
-      ctx.fillRect(x, boxY + 6, 42, 3);
+      ctx.fillRect(direction > 0 ? x : x - 42, boxY + 6, 42, 3);
       ctx.restore();
     };
     rail(boxX + 8, '#32dcff', 1);
@@ -569,7 +571,7 @@ class PenaltisGame {
       const count = suddenDeath ? 4 : 3;
       for (let i = 0; i < count; i++) {
         const x = startX + direction * i * 20;
-        const y = boxY + 72;
+        const y = boxY + 64;
         const result = history[i];
         const color = result === 'goal' ? '#4cff9b' : result === 'saved' ? '#ff526e' : '#78909b';
         ctx.save();
